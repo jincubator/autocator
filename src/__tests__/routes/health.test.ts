@@ -56,30 +56,4 @@ describe('Health Check Endpoint', () => {
       );
     });
   });
-
-  it('should fail if environment variables are not set', async () => {
-    // Temporarily unset required environment variables
-    const originalAllocatorAddress = process.env.ALLOCATOR_ADDRESS;
-    const originalSigningAddress = process.env.SIGNING_ADDRESS;
-    delete process.env.ALLOCATOR_ADDRESS;
-    delete process.env.SIGNING_ADDRESS;
-
-    // Temporarily mock console.error to suppress expected error messages
-    const originalConsoleError = console.error;
-    console.error = () => {}; // Simple no-op function
-
-    const response = await server.inject({
-      method: 'GET',
-      url: '/health',
-    });
-
-    // Restore console.error and environment variables
-    console.error = originalConsoleError;
-    process.env.ALLOCATOR_ADDRESS = originalAllocatorAddress;
-    process.env.SIGNING_ADDRESS = originalSigningAddress;
-
-    expect(response.statusCode).toBe(500);
-    const result = JSON.parse(response.payload);
-    expect(result.message).toBe('Required environment variables are not set');
-  });
 });

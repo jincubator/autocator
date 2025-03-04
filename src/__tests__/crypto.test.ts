@@ -3,6 +3,13 @@ import { type StoredCompactMessage } from '../compact';
 
 // Test suite for cryptographic functions used in Autocator
 describe('crypto', () => {
+  // Ensure environment variables are set before tests run
+  beforeAll(() => {
+    if (!process.env.ALLOCATOR_ADDRESS || !process.env.SIGNING_ADDRESS) {
+      process.env.ALLOCATOR_ADDRESS = '0x2345678901234567890123456789012345678901';
+      process.env.SIGNING_ADDRESS = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
+    }
+  });
   describe('generateClaimHash', () => {
     it('should generate consistent hash for a compact message', async () => {
       const testCompact: StoredCompactMessage = {

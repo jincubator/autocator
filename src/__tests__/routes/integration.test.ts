@@ -21,6 +21,12 @@ describe('Integration Tests', () => {
   const sponsorAddress = validPayload.address;
 
   beforeEach(async () => {
+    // Ensure environment variables are set
+    if (!process.env.ALLOCATOR_ADDRESS || !process.env.SIGNING_ADDRESS) {
+      process.env.ALLOCATOR_ADDRESS = '0x2345678901234567890123456789012345678901';
+      process.env.SIGNING_ADDRESS = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
+    }
+    
     server = await createTestServer();
     originalRequest = graphqlClient.request;
 
