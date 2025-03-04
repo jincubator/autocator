@@ -4,3 +4,4 @@ export * from './structure';
 export * from './domain';
 export * from './allocation';
 export * from './compact';
+export * from './onchain-registration';
