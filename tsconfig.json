@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "typeRoots": ["./node_modules/@types", "./src/types"],
+    "noEmit": true,
+    "paths": {
+      "webauthn-p256": ["./src/types/webauthn-p256.d.ts"]
+    },
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "allowJs": true,
+    "checkJs": false,
+    "types": ["node", "jest"]
+  },
+  "include": ["src/**/*", "src/**/*.test.ts", "src/types/*.d.ts"],
+  "exclude": ["node_modules", "dist"]
+}

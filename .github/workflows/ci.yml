@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 9.14.4
+
+    - name: Get pnpm store directory
+      id: pnpm-store-path
+      shell: bash
+      run: |
+        echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+    - uses: actions/cache@v3
+      name: Setup pnpm cache
+      with:
+        path: ${{ steps.pnpm-store-path.outputs.STORE_PATH }}
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-pnpm-store-
+
+    - name: Install dependencies
+      run: pnpm install:all
+
+    - name: Type check backend
+      run: pnpm type-check
+
+    - name: Type check frontend
+      run: cd frontend && pnpm tsc --noEmit -p tsconfig.app.json
+
+    - name: Build frontend and backend
+      run: pnpm build:all
+
+    - name: Check formatting
+      run: pnpm prettier --check "src/**/!(*d).ts"
+
+    - name: Lint backend
+      run: pnpm eslint src/ --max-warnings 0
+
+    - name: Lint frontend
+      run: cd frontend && pnpm eslint . --max-warnings 0
+
+    - name: Verify no tests were removed
+      run: pnpm check-test-files
+
+    - name: Run tests
+      env:
+        NODE_OPTIONS: '--experimental-vm-modules --no-warnings'
+        SIGNING_ADDRESS: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
+        ALLOCATOR_ADDRESS: '0x2345678901234567890123456789012345678901'
+        PRIVATE_KEY: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
+        DOMAIN: 'autocator.example'
+        BASE_URL: 'https://autocator.example'
+        NODE_ENV: 'test'
+      run: |
+        mkdir -p test-data
+        pnpm test
+
+    - name: Run smoke tests
+      env:
+        NODE_OPTIONS: '--experimental-vm-modules --no-warnings'
+        SIGNING_ADDRESS: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
+        ALLOCATOR_ADDRESS: '0x2345678901234567890123456789012345678901'
+        PRIVATE_KEY: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
+        DOMAIN: 'autocator.example'
+        BASE_URL: 'https://autocator.example'
+        NODE_ENV: 'test'
+      run: pnpm smoke-test

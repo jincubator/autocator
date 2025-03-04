@@ -1,0 +1,89 @@
+{
+  "name": "autocator",
+  "version": "0.1.0",
+  "author": "0age",
+  "description": "A server-based allocator for The Compact with per-action authentication using Typescript & Node.js",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "packageManager": "pnpm@9.14.4",
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "dev:all": "concurrently \"pnpm dev\" \"cd frontend && sleep 1.2 && pnpm dev\"",
+    "install:all": "pnpm install && cd frontend && pnpm install && cd -",
+    "prebuild": "rm -rf dist && rm -rf frontend/dist",
+    "build": "(cd frontend && pnpm build) && esbuild src/index.ts --bundle --platform=node --outdir=dist --format=esm --sourcemap --packages=external && cp .env dist/ 2>/dev/null || true && cp -r frontend/dist dist/frontend",
+    "build:all": "pnpm build",
+    "test": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --config jest.config.ts --detectOpenHandles --maxWorkers=50% --maxConcurrency=7",
+    "test:parallel": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --config jest.config.ts --runInBand=false --bail --maxWorkers=90%",
+    "test:related": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --config jest.config.ts --bail --findRelatedTests --maxWorkers=50% --maxConcurrency=7",
+    "smoke-test": "node scripts/smoke-test.js",
+    "smoke-test:precommit": "SMOKE_TEST_PORT=4000 node scripts/smoke-test.js",
+    "lint": "eslint src/",
+    "type-check": "tsc --noEmit -p tsconfig.lint.json",
+    "type-check:staged": "tsc --noEmit --skipLibCheck --skipDefaultLibCheck --target ES2022 --module ESNext --moduleResolution bundler --strict --esModuleInterop --forceConsistentCasingInFileNames --baseUrl . --paths viem:['./src/types/viem.d.ts'] --paths webauthn-p256:['./src/types/webauthn-p256.d.ts'] src/types/fastify.d.ts",
+    "type-check:staged-files": "tsc --noEmit --skipLibCheck --skipDefaultLibCheck",
+    "format": "prettier --write \"src/**/*.ts\" && cd frontend && prettier --write \"src/**/*.{ts,tsx}\" && cd -",
+    "format:check": "prettier --check \"src/**/*.ts\" && cd frontend && prettier --check \"src/**/*.{ts,tsx}\" && cd -",
+    "prepare": "husky",
+    "check-test-files": "node scripts/check-test-files.js",
+    "lint-staged": "lint-staged",
+    "check:all": "pnpm build:all || true && pnpm lint || true && cd frontend && pnpm lint || true && cd - && pnpm format:check || true && pnpm type-check || true && cd frontend && pnpm tsc --noEmit -p tsconfig.app.json || true && cd - && pnpm test:parallel || true && pnpm smoke-test || true"
+  },
+  "lint-staged": {
+    "**/*.{test,spec}.ts": [
+      "node scripts/check-test-files.js"
+    ],
+    "src/**/!(*d).ts": [
+      "prettier --write",
+      "eslint --fix",
+      "prettier --check",
+      "eslint --max-warnings 0",
+      "tsc --noEmit --skipLibCheck",
+      "pnpm test:related",
+      "pnpm smoke-test:precommit"
+    ],
+    "frontend/**/*.{ts,tsx,js}": [
+      "prettier --write",
+      "cd frontend && eslint . --fix --max-warnings 0",
+      "prettier --check",
+      "cd frontend && tsc --noEmit -p tsconfig.app.json"
+    ],
+    "*.{json,md}": [
+      "prettier --write",
+      "prettier --check"
+    ]
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.2.14",
+    "@fastify/cors": "^8.4.1",
+    "@fastify/env": "^4.3.0",
+    "@fastify/static": "^6.12.0",
+    "dotenv": "^16.4.7",
+    "fastify": "^4.24.3",
+    "graphql": "^16.9.0",
+    "graphql-request": "^6.1.0",
+    "viem": "^2.21.54"
+  },
+  "devDependencies": {
+    "@types/emscripten": "^1.39.13",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^20.9.1",
+    "@typescript-eslint/eslint-plugin": "^8.17.0",
+    "@typescript-eslint/parser": "^8.17.0",
+    "concurrently": "^9.1.0",
+    "esbuild": "^0.24.0",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "husky": "^8.0.3",
+    "jest": "^29.7.0",
+    "lint-staged": "^15.2.10",
+    "pino-pretty": "^13.0.0",
+    "prettier": "^3.4.2",
+    "ts-jest": "^29.2.5",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
