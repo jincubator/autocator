@@ -105,8 +105,7 @@ export async function fetchAndCacheSupportedChains(
   } catch (error) {
     // Log error if server instance is provided
     if (server) {
-      server.log.error({
-        msg: 'GraphQL Network Error',
+      console.error('GraphQL Network Error:', {
         err: error instanceof Error ? error.message : String(error),
         path: '/graphql',
       });

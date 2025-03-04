@@ -14,11 +14,15 @@ import {
   fetchAndCacheSupportedChains,
 } from '../../graphql';
 import { RequestDocument, Variables, RequestOptions } from 'graphql-request';
-import { hexToBytes } from 'viem/utils';
+import { hexToBytes, getAddress } from 'viem/utils';
+import { signMessage } from 'viem/accounts';
+
+// Test private key (do not use in production)
+const TEST_PRIVATE_KEY =
+  '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
 
 describe('Compact Routes', () => {
   let server: FastifyInstance;
-  let sessionId: string;
   let originalRequest: typeof graphqlClient.request;
 
   beforeEach(async () => {
@@ -55,39 +59,6 @@ describe('Compact Routes', () => {
         },
       },
     });
-
-    // Create a session for testing
-    const sessionResponse = await server.inject({
-      method: 'GET',
-      url: `/session/1/${validPayload.address}`,
-    });
-
-    expect(sessionResponse.statusCode).toBe(200);
-    const sessionRequest = JSON.parse(sessionResponse.payload);
-
-    // Normalize timestamps to match database precision
-    const payload = {
-      ...sessionRequest.session,
-      issuedAt: new Date(sessionRequest.session.issuedAt).toISOString(),
-      expirationTime: new Date(
-        sessionRequest.session.expirationTime
-      ).toISOString(),
-    };
-
-    const signature = await generateSignature(payload);
-    const response = await server.inject({
-      method: 'POST',
-      url: '/session',
-      payload: {
-        payload,
-        signature,
-      },
-    });
-
-    const result = JSON.parse(response.payload);
-    expect(response.statusCode).toBe(200);
-    expect(result.session?.id).toBeDefined();
-    sessionId = result.session.id;
   });
 
   afterEach(async () => {
@@ -96,14 +67,26 @@ describe('Compact Routes', () => {
     graphqlClient.request = originalRequest;
   });
 
+  // Helper to generate sponsor signature for a compact
+  async function generateSponsorSignature(compact: any, chainId: string): Promise<string> {
+    // Create a message that includes the compact details
+    const message = `I am signing this compact with:
+Arbiter: ${compact.arbiter}
+Sponsor: ${compact.sponsor}
+ID: ${compact.id}
+Amount: ${compact.amount}
+Expires: ${compact.expires}
+Chain ID: ${chainId}`;
+    
+    return await generateSignature(message);
+  }
+
   describe('GET /suggested-nonce/:chainId', () => {
-    it('should return a valid nonce for authenticated user', async () => {
+    it('should return a valid nonce for a sponsor', async () => {
+      const sponsorAddress = validPayload.address;
       const response = await server.inject({
         method: 'GET',
-        url: '/suggested-nonce/1',
-        headers: {
-          'x-session-id': sessionId,
-        },
+        url: `/suggested-nonce/1?sponsor=${sponsorAddress}`,
       });
 
       expect(response.statusCode).toBe(200);
@@ -113,34 +96,37 @@ describe('Compact Routes', () => {
 
       // Verify nonce format: first 20 bytes should match sponsor address
       const nonceHex = BigInt(result.nonce).toString(16).padStart(64, '0');
-      const sponsorHex = validPayload.address.toLowerCase().slice(2);
+      const sponsorHex = sponsorAddress.toLowerCase().slice(2);
       expect(nonceHex.slice(0, 40)).toBe(sponsorHex);
     });
 
-    it('should reject request without session', async () => {
+    it('should reject request without sponsor', async () => {
       const response = await server.inject({
         method: 'GET',
         url: '/suggested-nonce/1',
       });
 
-      expect(response.statusCode).toBe(401);
+      expect(response.statusCode).toBe(400);
+      const result = JSON.parse(response.payload);
+      expect(result.error).toBe('Sponsor address is required');
     });
   });
 
   describe('POST /compact', () => {
-    it('should submit valid compact', async () => {
+    it('should submit valid compact with sponsor signature', async () => {
       const freshCompact = getFreshCompact();
+      const compactData = compactToAPI(freshCompact);
+      const sponsorSignature = await generateSponsorSignature(compactData, '1');
+      
       const compactPayload = {
         chainId: '1',
-        compact: compactToAPI(freshCompact),
+        compact: compactData,
+        sponsorSignature,
       };
 
       const response = await server.inject({
         method: 'POST',
         url: '/compact',
-        headers: {
-          'x-session-id': sessionId,
-        },
         payload: compactPayload,
       });
 
@@ -158,21 +144,42 @@ describe('Compact Routes', () => {
       );
     });
 
-    // New test for base 10 numeric string id
-    it('should submit valid compact with base 10 numeric string id', async () => {
+    it('should reject request without sponsor signature', async () => {
       const freshCompact = getFreshCompact();
-      const compactWithBase10Id = {
-        ...compactToAPI(freshCompact),
-        id: freshCompact.id.toString(10), // Convert id to base 10 string
+      const compactPayload = {
+        chainId: '1',
+        compact: compactToAPI(freshCompact),
       };
 
       const response = await server.inject({
         method: 'POST',
         url: '/compact',
-        headers: {
-          'x-session-id': sessionId,
+        payload: compactPayload,
+      });
+
+      expect(response.statusCode).toBe(400);
+      const result = JSON.parse(response.payload);
+      expect(result.error).toBe('Sponsor signature is required');
+    });
+
+    // New test for base 10 numeric string id
+    it('should submit valid compact with base 10 numeric string id', async () => {
+      const freshCompact = getFreshCompact();
+      const compactData = {
+        ...compactToAPI(freshCompact),
+        id: freshCompact.id.toString(10), // Convert id to base 10 string
+      };
+      
+      const sponsorSignature = await generateSponsorSignature(compactData, '1');
+
+      const response = await server.inject({
+        method: 'POST',
+        url: '/compact',
+        payload: { 
+          chainId: '1', 
+          compact: compactData,
+          sponsorSignature,
         },
-        payload: { chainId: '1', compact: compactWithBase10Id },
       });
 
       expect(response.statusCode).toBe(200);
@@ -192,14 +199,17 @@ describe('Compact Routes', () => {
         amount: '0x' + BigInt(freshCompact.amount).toString(16),
         nonce: '0x' + freshCompact.nonce.toString(16),
       };
+      
+      const sponsorSignature = await generateSponsorSignature(hexCompact, '1');
 
       const response = await server.inject({
         method: 'POST',
         url: '/compact',
-        headers: {
-          'x-session-id': sessionId,
+        payload: { 
+          chainId: '1', 
+          compact: hexCompact,
+          sponsorSignature,
         },
-        payload: { chainId: '1', compact: hexCompact },
       });
 
       expect(response.statusCode).toBe(200);
@@ -219,14 +229,17 @@ describe('Compact Routes', () => {
         amount: '0x' + BigInt(freshCompact.amount).toString(16),
         nonce: freshCompact.nonce.toString(),
       };
+      
+      const sponsorSignature = await generateSponsorSignature(mixedCompact, '1');
 
       const response = await server.inject({
         method: 'POST',
         url: '/compact',
-        headers: {
-          'x-session-id': sessionId,
+        payload: { 
+          chainId: '1', 
+          compact: mixedCompact,
+          sponsorSignature,
         },
-        payload: { chainId: '1', compact: mixedCompact },
       });
 
       expect(response.statusCode).toBe(200);
@@ -243,14 +256,20 @@ describe('Compact Routes', () => {
         ...compactToAPI(freshCompact),
         id: '0xInvalidHex',
       };
+      
+      const sponsorSignature = await generateSponsorSignature(
+        { ...invalidHexCompact, id: '0x123' }, // Use valid ID for signature
+        '1'
+      );
 
       const response = await server.inject({
         method: 'POST',
         url: '/compact',
-        headers: {
-          'x-session-id': sessionId,
+        payload: { 
+          chainId: '1', 
+          compact: invalidHexCompact,
+          sponsorSignature,
         },
-        payload: { chainId: '1', compact: invalidHexCompact },
       });
 
       expect(response.statusCode).toBe(400);
@@ -260,20 +279,22 @@ describe('Compact Routes', () => {
 
     it('should handle null nonce by generating one', async () => {
       const freshCompact = getFreshCompact();
+      const compactData = {
+        ...compactToAPI(freshCompact),
+        nonce: null,
+      };
+      
+      const sponsorSignature = await generateSponsorSignature(compactData, '1');
+      
       const compactPayload = {
         chainId: '1',
-        compact: {
-          ...compactToAPI(freshCompact),
-          nonce: null,
-        },
+        compact: compactData,
+        sponsorSignature,
       };
 
       const response = await server.inject({
         method: 'POST',
         url: '/compact',
-        headers: {
-          'x-session-id': sessionId,
-        },
         payload: compactPayload,
       });
 
@@ -288,34 +309,21 @@ describe('Compact Routes', () => {
       expect(nonceHex.slice(0, 40)).toBe(sponsorHex);
     });
 
-    it('should reject request without session', async () => {
-      const freshCompact = getFreshCompact();
-      const compactPayload = {
-        chainId: '1',
-        compact: compactToAPI(freshCompact),
-      };
-
-      const response = await server.inject({
-        method: 'POST',
-        url: '/compact',
-        payload: compactPayload,
-      });
-
-      expect(response.statusCode).toBe(401);
-    });
-
     it('should store nonce after successful submission', async (): Promise<void> => {
       const freshCompact = getFreshCompact();
       const chainId = '1';
+      const compactData = compactToAPI(freshCompact);
+      const sponsorSignature = await generateSponsorSignature(compactData, chainId);
 
       // Submit compact
       const response = await server.inject({
         method: 'POST',
         url: '/compact',
-        headers: {
-          'x-session-id': sessionId,
+        payload: { 
+          chainId, 
+          compact: compactData,
+          sponsorSignature,
         },
-        payload: { chainId, compact: compactToAPI(freshCompact) },
       });
 
       expect(response.statusCode).toBe(200);
@@ -343,13 +351,26 @@ describe('Compact Routes', () => {
   });
 
   describe('GET /compacts', () => {
-    it('should return compacts for authenticated user', async () => {
+    it('should return compacts for a specific sponsor', async () => {
+      // First submit a compact to ensure there's data
+      const freshCompact = getFreshCompact();
+      const compactData = compactToAPI(freshCompact);
+      const sponsorSignature = await generateSponsorSignature(compactData, '1');
+      
+      await server.inject({
+        method: 'POST',
+        url: '/compact',
+        payload: {
+          chainId: '1',
+          compact: compactData,
+          sponsorSignature,
+        },
+      });
+
+      // Now get compacts for this sponsor
       const response = await server.inject({
         method: 'GET',
-        url: '/compacts',
-        headers: {
-          'x-session-id': sessionId,
-        },
+        url: `/compacts?sponsor=${freshCompact.sponsor}`,
       });
 
       expect(response.statusCode).toBe(200);
@@ -357,32 +378,33 @@ describe('Compact Routes', () => {
       expect(Array.isArray(result)).toBe(true);
     });
 
-    it('should reject request without session', async () => {
+    it('should reject request without sponsor', async () => {
       const response = await server.inject({
         method: 'GET',
         url: '/compacts',
       });
 
-      expect(response.statusCode).toBe(401);
+      expect(response.statusCode).toBe(400);
+      const result = JSON.parse(response.payload);
+      expect(result.error).toBe('Sponsor address is required');
     });
   });
 
   describe('GET /compact/:chainId/:claimHash', () => {
     it('should return specific compact', async () => {
       const freshCompact = getFreshCompact();
-      const compactPayload = {
-        chainId: '1',
-        compact: compactToAPI(freshCompact),
-      };
-
+      const compactData = compactToAPI(freshCompact);
+      const sponsorSignature = await generateSponsorSignature(compactData, '1');
+      
       // First submit a compact
       const submitResponse = await server.inject({
         method: 'POST',
         url: '/compact',
-        headers: {
-          'x-session-id': sessionId,
+        payload: {
+          chainId: '1',
+          compact: compactData,
+          sponsorSignature,
         },
-        payload: compactPayload,
       });
 
       const submitResult = JSON.parse(submitResponse.payload);
@@ -396,16 +418,12 @@ describe('Compact Routes', () => {
       const response = await server.inject({
         method: 'GET',
         url: `/compact/1/${hash}`,
-        headers: {
-          'x-session-id': sessionId,
-        },
       });
 
       if (response.statusCode === 500) {
         console.error('Got 500 error:', {
           payload: response.payload,
           hash,
-          sessionId,
         });
       }
 
@@ -421,9 +439,6 @@ describe('Compact Routes', () => {
       const response = await server.inject({
         method: 'GET',
         url: '/compact/1/0x0000000000000000000000000000000000000000000000000000000000000000',
-        headers: {
-          'x-session-id': sessionId,
-        },
       });
 
       expect(response.statusCode).toBe(404);

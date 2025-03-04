@@ -13,55 +13,15 @@ import { fetchAndCacheSupportedChains } from '../../graphql';
 // Helper to generate test data
 const defaultBaseUrl = 'https://autocator.example';
 export const validPayload = {
-  domain: new URL(process.env.BASE_URL || defaultBaseUrl).host,
   address: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
-  uri: process.env.BASE_URL || defaultBaseUrl,
-  statement: 'Sign in to Smallocator',
-  version: '1',
-  chainId: 1,
-  nonce: randomUUID(),
-  issuedAt: new Date().toISOString(),
-  expirationTime: new Date(Date.now() + 3600000).toISOString(),
 };
-
-// Helper to get fresh valid payload with current timestamps
-export function getFreshValidPayload(): typeof validPayload {
-  const now = new Date();
-  const expirationTime = new Date(now.getTime() + 3600000);
-  return {
-    ...validPayload,
-    nonce: randomUUID(),
-    issuedAt: now.toISOString(),
-    expirationTime: expirationTime.toISOString(),
-  };
-}
-
-// Helper to format message according to EIP-4361
-export function formatTestMessage(payload: typeof validPayload): string {
-  return [
-    `${payload.domain} wants you to sign in with your Ethereum account:`,
-    payload.address,
-    '',
-    payload.statement,
-    '',
-    `URI: ${payload.uri}`,
-    `Version: ${payload.version}`,
-    `Chain ID: ${payload.chainId}`,
-    `Nonce: ${payload.nonce}`,
-    `Issued At: ${payload.issuedAt}`,
-    `Expiration Time: ${payload.expirationTime}`,
-  ].join('\n');
-}
 
 // Test private key (do not use in production)
 const TEST_PRIVATE_KEY =
   '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
 
-// Helper to generate signature
-export async function generateSignature(
-  payload: typeof validPayload
-): Promise<string> {
-  const message = formatTestMessage(payload);
+// Helper to generate signature for any message
+export async function generateSignature(message: string): Promise<string> {
   const signature = await signMessage({
     message,
     privateKey: TEST_PRIVATE_KEY as `0x${string}`,
@@ -72,53 +32,31 @@ export async function generateSignature(
 // Create a test server instance
 export async function createTestServer(): Promise<FastifyInstance> {
   const server = fastify({
-    logger: false,
+    logger: {
+      level: 'error',
+      transport: {
+        target: 'pino-pretty',
+        options: {
+          translateTime: 'HH:MM:ss Z',
+          ignore: 'pid,hostname,reqId,responseTime,req,res',
+          colorize: true,
+          messageFormat: '{msg}',
+        },
+      },
+    },
   });
 
   try {
     // Setup GraphQL mocks before any server initialization
     setupGraphQLMocks();
 
-    // Register plugins
-    await server.register(env, {
-      schema: {
-        type: 'object',
-        required: [
-          'SIGNING_ADDRESS',
-          'ALLOCATOR_ADDRESS',
-          'PRIVATE_KEY',
-          'DOMAIN',
-          'BASE_URL',
-        ],
-        properties: {
-          SIGNING_ADDRESS: {
-            type: 'string',
-            default: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', // Address corresponding to TEST_PRIVATE_KEY
-          },
-          ALLOCATOR_ADDRESS: {
-            type: 'string',
-            default: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
-          },
-          PRIVATE_KEY: {
-            type: 'string',
-            default: TEST_PRIVATE_KEY,
-          },
-          DOMAIN: {
-            type: 'string',
-            default: 'autocator.example',
-          },
-          BASE_URL: {
-            type: 'string',
-            default: 'https://autocator.example',
-          },
-          SUPPORTED_CHAINS_REFRESH_INTERVAL: {
-            type: 'string',
-            default: '600',
-          },
-        },
-      },
-      dotenv: false,
-    });
+    // Set environment variables directly for testing
+    process.env.SIGNING_ADDRESS = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
+    process.env.ALLOCATOR_ADDRESS = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
+    process.env.PRIVATE_KEY = TEST_PRIVATE_KEY;
+    process.env.DOMAIN = 'autocator.example';
+    process.env.BASE_URL = 'https://autocator.example';
+    process.env.SUPPORTED_CHAINS_REFRESH_INTERVAL = '600';
 
     await server.register(cors, {
       origin: '*',
@@ -146,43 +84,6 @@ export async function createTestServer(): Promise<FastifyInstance> {
   }
 }
 
-// Helper to create a test session
-export async function createTestSession(
-  server: FastifyInstance,
-  address: string = validPayload.address
-): Promise<string> {
-  // First create a session request
-  const sessionResponse = await server.inject({
-    method: 'GET',
-    url: `/session/1/${address}`,
-  });
-
-  if (sessionResponse.statusCode !== 200) {
-    throw new Error(
-      `Failed to create session request: ${sessionResponse.payload}`
-    );
-  }
-
-  const sessionRequest = JSON.parse(sessionResponse.payload);
-
-  // Then create the session with the same payload
-  const signature = await generateSignature(sessionRequest.session);
-  const response = await server.inject({
-    method: 'POST',
-    url: '/session',
-    payload: {
-      payload: sessionRequest.session,
-      signature,
-    },
-  });
-
-  if (response.statusCode !== 200) {
-    throw new Error(`Failed to create session: ${response.payload}`);
-  }
-
-  const result = JSON.parse(response.payload);
-  return result.session.id;
-}
 
 // Helper to pad hex string to specific byte length
 function padToBytes(hex: string, byteLength: number): string {
@@ -273,5 +174,6 @@ export function compactToAPI(
 }
 
 export async function cleanupTestServer(): Promise<void> {
-  await dbManager.cleanup();
+  // No need to call dbManager.cleanup() here as it's already called in the global afterEach
+  // This prevents double cleanup which might cause issues
 }

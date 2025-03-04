@@ -89,21 +89,25 @@ function toStoredCompact(
 export async function submitCompact(
   server: FastifyInstance,
   submission: CompactSubmission,
-  sponsorAddress: string
+  sponsorAddress: string,
+  sponsorSignature: string
 ): Promise<{ hash: string; signature: string; nonce: string }> {
   try {
     // Start a transaction
     await server.db.query('BEGIN');
 
-    // Lock the sponsor's row to prevent concurrent updates
-    await server.db.query(
-      'SELECT id FROM sessions WHERE address = $1 FOR UPDATE',
-      [addressToBytes(sponsorAddress)]
-    );
-
-    // Validate sponsor matches the session
-    if (getAddress(submission.compact.sponsor) !== getAddress(sponsorAddress)) {
-      throw new Error('Sponsor address does not match session');
+    // Validate sponsor address format
+    const normalizedSponsorAddress = getAddress(sponsorAddress);
+    
+    // Validate sponsor matches the compact
+    if (getAddress(submission.compact.sponsor) !== normalizedSponsorAddress) {
+      throw new Error('Sponsor address does not match compact');
+    }
+    
+    // TODO: Implement proper sponsor signature verification
+    // For now, just check that a signature was provided
+    if (!sponsorSignature || !sponsorSignature.startsWith('0x')) {
+      throw new Error('Invalid sponsor signature format');
     }
 
     // Generate nonce if not provided (do this before validation)

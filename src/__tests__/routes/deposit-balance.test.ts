@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import {
   createTestServer,
   cleanupTestServer,
-  createTestSession,
+  validPayload,
 } from '../utils/test-server';
 import {
   graphqlClient,
@@ -17,14 +17,13 @@ import { hexToBytes } from 'viem/utils';
 
 describe('Deposit Balance Routes', () => {
   let server: FastifyInstance;
-  let sessionId: string;
   let originalRequest: typeof graphqlClient.request;
   const realDateNow = Date.now;
+  const sponsorAddress = validPayload.address;
 
   beforeEach(async () => {
-    // Set up test server and session
+    // Set up test server
     server = await createTestServer();
-    sessionId = await createTestSession(server);
 
     // Store original function
     originalRequest = graphqlClient.request;
@@ -110,10 +109,7 @@ describe('Deposit Balance Routes', () => {
     // Get balances
     const response = await server.inject({
       method: 'GET',
-      url: '/balances',
-      headers: {
-        'x-session-id': sessionId,
-      },
+      url: `/balances?sponsor=${sponsorAddress}`,
     });
 
     expect(response.statusCode).toBe(200);
@@ -200,10 +196,7 @@ describe('Deposit Balance Routes', () => {
     // Get balances
     const response = await server.inject({
       method: 'GET',
-      url: '/balances',
-      headers: {
-        'x-session-id': sessionId,
-      },
+      url: `/balances?sponsor=${sponsorAddress}`,
     });
 
     expect(response.statusCode).toBe(200);
@@ -299,10 +292,7 @@ describe('Deposit Balance Routes', () => {
     // Get balances
     const response = await server.inject({
       method: 'GET',
-      url: '/balances',
-      headers: {
-        'x-session-id': sessionId,
-      },
+      url: `/balances?sponsor=${sponsorAddress}`,
     });
 
     expect(response.statusCode).toBe(200);
@@ -504,10 +494,7 @@ describe('Deposit Balance Routes', () => {
     // Get balances
     const response = await server.inject({
       method: 'GET',
-      url: '/balances',
-      headers: {
-        'x-session-id': sessionId,
-      },
+      url: `/balances?sponsor=${sponsorAddress}`,
     });
 
     expect(response.statusCode).toBe(200);
@@ -709,10 +696,7 @@ describe('Deposit Balance Routes', () => {
     // Get balances
     const response = await server.inject({
       method: 'GET',
-      url: '/balances',
-      headers: {
-        'x-session-id': sessionId,
-      },
+      url: `/balances?sponsor=${sponsorAddress}`,
     });
 
     expect(response.statusCode).toBe(200);

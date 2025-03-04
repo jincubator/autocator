@@ -43,8 +43,15 @@ class DatabaseManager {
 
   async cleanup(): Promise<void> {
     if (this.db) {
-      await dropTables(this.db);
-      this.db = null;
+      try {
+        await dropTables(this.db);
+        // Skip closing the database as it causes issues with dynamic imports
+        // await this.db.close();
+      } catch (error) {
+        console.error('Error during database cleanup:', error);
+      } finally {
+        this.db = null;
+      }
     }
   }
 }
@@ -60,12 +67,20 @@ beforeEach(async () => {
 afterAll(async () => {
   // Wait for any pending operations to complete
   await new Promise((resolve) => setTimeout(resolve, 500));
-  await dbManager.cleanup();
+  try {
+    await dbManager.cleanup();
+  } catch (error) {
+    console.error('Error during global cleanup:', error);
+  }
 }, 10000);
 
 // Reset database between tests
 afterEach(async () => {
   // Wait for any pending operations to complete
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  await dbManager.cleanup();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  try {
+    await dbManager.cleanup();
+  } catch (error) {
+    console.error('Error during test cleanup:', error);
+  }
 });

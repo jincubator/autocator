@@ -6,7 +6,6 @@ import {
   getAllResourceLocks,
   getCachedSupportedChains,
 } from '../graphql';
-import { createAuthMiddleware } from './session';
 import { toBigInt } from '../utils/encoding';
 
 interface Balance {
@@ -21,16 +20,15 @@ interface Balance {
 export async function setupBalanceRoutes(
   server: FastifyInstance
 ): Promise<void> {
-  const authenticateRequest = createAuthMiddleware(server);
-
-  // Get balance for all resource locks
-  server.get(
+  // Get balance for all resource locks for a specific sponsor
+  server.get<{
+    Querystring: { sponsor: string };
+  }>(
     '/balances',
-    {
-      preHandler: authenticateRequest,
-    },
     async (
-      request: FastifyRequest,
+      request: FastifyRequest<{
+        Querystring: { sponsor: string };
+      }>,
       reply: FastifyReply
     ): Promise<
       | {
@@ -39,14 +37,23 @@ export async function setupBalanceRoutes(
       | { error: string }
     > => {
       try {
-        const sponsor = request.session!.address;
-        server.log.debug(`Processing balances request for sponsor: ${sponsor}`);
-
+        const { sponsor } = request.query;
+        
+        if (!sponsor) {
+          reply.code(400);
+          return { error: 'Sponsor address is required' };
+        }
+        
+        let normalizedSponsor: string;
+        try {
+          normalizedSponsor = getAddress(sponsor);
+        } catch (error) {
+          reply.code(400);
+          return { error: 'Invalid sponsor address format' };
+        }
+        
         // Get all resource locks for the sponsor
-        const response = await getAllResourceLocks(sponsor);
-        server.log.debug(
-          `Found ${response?.account?.resourceLocks?.items?.length || 0} resource locks`
-        );
+        const response = await getAllResourceLocks(normalizedSponsor);
 
         // Add defensive checks
         if (!response?.account?.resourceLocks?.items) {
@@ -72,7 +79,7 @@ export async function setupBalanceRoutes(
               // Get details from GraphQL
               const lockDetails = await getCompactDetails({
                 allocator: process.env.ALLOCATOR_ADDRESS!,
-                sponsor,
+                sponsor: normalizedSponsor,
                 lockId: lock.resourceLock.lockId,
                 chainId: lock.chainId,
               });
@@ -92,15 +99,7 @@ export async function setupBalanceRoutes(
                 (sum, delta) => sum + BigInt(delta.delta),
                 BigInt(0)
               );
-              server.log.debug(
-                {
-                  chainId: lock.chainId,
-                  lockId: lock.resourceLock.lockId,
-                  pendingBalance: pendingBalance.toString(),
-                  deltas: lockDetails.accountDeltas.items.map((d) => d.delta),
-                },
-                'Unfinalized deposits'
-              );
+              // Unfinalized deposits calculation
 
               // The balance from GraphQL includes unfinalized deposits
               // So we need to subtract them to get the finalized balance
@@ -113,18 +112,7 @@ export async function setupBalanceRoutes(
               // This is our allocatable balance (only includes finalized amounts)
               const allocatableBalance = finalizedBalance;
 
-              server.log.debug(
-                {
-                  chainId: lock.chainId,
-                  lockId: lock.resourceLock.lockId,
-                  currentBalance: currentBalance.toString(),
-                  pendingBalance: pendingBalance.toString(),
-                  finalizedBalance: finalizedBalance.toString(),
-                  allocatableBalance: allocatableBalance.toString(),
-                  pendingExceedsBalance: pendingBalance > currentBalance,
-                },
-                'Balance calculation'
-              );
+              // Balance calculation
 
               // Convert lockId to BigInt
               const lockIdBigInt = toBigInt(lock.resourceLock.lockId, 'lockId');
@@ -135,20 +123,12 @@ export async function setupBalanceRoutes(
               // Get allocated balance
               const allocatedBalance = await getAllocatedBalance(
                 server.db,
-                sponsor,
+                normalizedSponsor,
                 lock.chainId,
                 lockIdBigInt,
                 lockDetails.account.claims.items.map((claim) => claim.claimHash)
               );
-              server.log.debug(
-                {
-                  chainId: lock.chainId,
-                  lockId: lock.resourceLock.lockId,
-                  allocatedBalance: allocatedBalance.toString(),
-                  processedClaims: lockDetails.account.claims.items.length,
-                },
-                'Allocated balance calculation'
-              );
+              // Allocated balance calculation
 
               // Calculate available balance
               let balanceAvailableToAllocate = BigInt(0);
@@ -187,116 +167,120 @@ export async function setupBalanceRoutes(
     }
   );
 
-  // Protected routes
-  server.register(async function (protectedRoutes) {
-    // Add authentication to all routes in this context
-    protectedRoutes.addHook('preHandler', authenticateRequest);
-
-    // Get available balance for a specific lock
-    protectedRoutes.get<{
-      Params: { chainId: string; lockId: string };
-    }>(
-      '/balance/:chainId/:lockId',
-      async (
-        request: FastifyRequest<{
-          Params: { chainId: string; lockId: string };
-        }>,
-        reply: FastifyReply
-      ) => {
-        if (!request.session) {
-          reply.code(401);
-          return { error: 'Unauthorized' };
+  // Get available balance for a specific lock
+  server.get<{
+    Params: { chainId: string; lockId: string };
+    Querystring: { sponsor: string };
+  }>(
+    '/balance/:chainId/:lockId',
+    async (
+      request: FastifyRequest<{
+        Params: { chainId: string; lockId: string };
+        Querystring: { sponsor: string };
+      }>,
+      reply: FastifyReply
+    ) => {
+      try {
+        const { chainId, lockId } = request.params;
+        const { sponsor } = request.query;
+        
+        if (!sponsor) {
+          reply.code(400);
+          return { error: 'Sponsor address is required' };
         }
-
+        
+        let normalizedSponsor: string;
         try {
-          const { chainId, lockId } = request.params;
-          const sponsor = request.session.address;
-
-          // Get details from GraphQL
-          const response = await getCompactDetails({
-            allocator: process.env.ALLOCATOR_ADDRESS!,
-            sponsor,
-            lockId,
-            chainId,
-          });
-
-          // Verify the resource lock exists
-          const resourceLock = response.account.resourceLocks.items[0];
-          if (!resourceLock) {
-            reply.code(404);
-            return { error: 'Resource lock not found' };
-          }
-
-          // Extract allocatorId from the lockId
-          const lockIdBigInt = toBigInt(lockId, 'lockId');
-          if (lockIdBigInt === null) {
-            throw new Error('Invalid lockId format');
-          }
-
-          const allocatorId =
-            (lockIdBigInt >> BigInt(160)) &
-            ((BigInt(1) << BigInt(92)) - BigInt(1));
-
-          // Get the cached chain config to verify allocatorId
-          const chainConfig = getCachedSupportedChains()?.find(
-            (chain) => chain.chainId === chainId
-          );
-
-          // Verify allocatorId matches
-          if (!chainConfig || BigInt(chainConfig.allocatorId) !== allocatorId) {
-            reply.code(400);
-            return { error: 'Invalid allocator ID' };
-          }
-
-          // Calculate pending balance (unfinalized deposits)
-          const pendingBalance = response.accountDeltas.items.reduce(
-            (sum, delta) => sum + BigInt(delta.delta),
-            BigInt(0)
-          );
-
-          // The balance from GraphQL includes unfinalized deposits
-          // So we need to subtract them to get the finalized balance
-          const currentBalance = BigInt(resourceLock.balance);
-          // If pending balance exceeds current balance, set finalized balance to 0
-          const finalizedBalance =
-            pendingBalance > currentBalance
-              ? BigInt(0)
-              : currentBalance - pendingBalance;
-          // This is our allocatable balance (only includes finalized amounts)
-          const allocatableBalance = finalizedBalance;
-
-          // Get allocated balance from database
-          const allocatedBalance = await getAllocatedBalance(
-            server.db,
-            sponsor,
-            chainId,
-            lockIdBigInt,
-            response.account.claims.items.map((claim) => claim.claimHash)
-          );
-
-          // Calculate balance available to allocate
-          let balanceAvailableToAllocate = BigInt(0);
-          if (resourceLock.withdrawalStatus === 0) {
-            if (allocatedBalance < allocatableBalance) {
-              balanceAvailableToAllocate =
-                allocatableBalance - allocatedBalance;
-            }
-          }
-
-          return {
-            allocatableBalance: allocatableBalance.toString(),
-            allocatedBalance: allocatedBalance.toString(),
-            balanceAvailableToAllocate: balanceAvailableToAllocate.toString(),
-            withdrawalStatus: resourceLock.withdrawalStatus,
-          };
+          normalizedSponsor = getAddress(sponsor);
         } catch (error) {
-          reply.code(500);
-          return {
-            error:
-              error instanceof Error ? error.message : 'Failed to get balance',
-          };
+          reply.code(400);
+          return { error: 'Invalid sponsor address format' };
         }
+
+        // Get details from GraphQL
+        const response = await getCompactDetails({
+          allocator: process.env.ALLOCATOR_ADDRESS!,
+          sponsor: normalizedSponsor,
+          lockId,
+          chainId,
+        });
+
+        // Verify the resource lock exists
+        const resourceLock = response.account.resourceLocks.items[0];
+        if (!resourceLock) {
+          reply.code(404);
+          return { error: 'Resource lock not found' };
+        }
+
+        // Extract allocatorId from the lockId
+        const lockIdBigInt = toBigInt(lockId, 'lockId');
+        if (lockIdBigInt === null) {
+          throw new Error('Invalid lockId format');
+        }
+
+        const allocatorId =
+          (lockIdBigInt >> BigInt(160)) &
+          ((BigInt(1) << BigInt(92)) - BigInt(1));
+
+        // Get the cached chain config to verify allocatorId
+        const chainConfig = getCachedSupportedChains()?.find(
+          (chain) => chain.chainId === chainId
+        );
+
+        // Verify allocatorId matches
+        if (!chainConfig || BigInt(chainConfig.allocatorId) !== allocatorId) {
+          reply.code(400);
+          return { error: 'Invalid allocator ID' };
+        }
+
+        // Calculate pending balance (unfinalized deposits)
+        const pendingBalance = response.accountDeltas.items.reduce(
+          (sum, delta) => sum + BigInt(delta.delta),
+          BigInt(0)
+        );
+
+        // The balance from GraphQL includes unfinalized deposits
+        // So we need to subtract them to get the finalized balance
+        const currentBalance = BigInt(resourceLock.balance);
+        // If pending balance exceeds current balance, set finalized balance to 0
+        const finalizedBalance =
+          pendingBalance > currentBalance
+            ? BigInt(0)
+            : currentBalance - pendingBalance;
+        // This is our allocatable balance (only includes finalized amounts)
+        const allocatableBalance = finalizedBalance;
+
+        // Get allocated balance from database
+        const allocatedBalance = await getAllocatedBalance(
+          server.db,
+          normalizedSponsor,
+          chainId,
+          lockIdBigInt,
+          response.account.claims.items.map((claim) => claim.claimHash)
+        );
+
+        // Calculate balance available to allocate
+        let balanceAvailableToAllocate = BigInt(0);
+        if (resourceLock.withdrawalStatus === 0) {
+          if (allocatedBalance < allocatableBalance) {
+            balanceAvailableToAllocate =
+              allocatableBalance - allocatedBalance;
+          }
+        }
+
+        return {
+          allocatableBalance: allocatableBalance.toString(),
+          allocatedBalance: allocatedBalance.toString(),
+          balanceAvailableToAllocate: balanceAvailableToAllocate.toString(),
+          withdrawalStatus: resourceLock.withdrawalStatus,
+        };
+      } catch (error) {
+        reply.code(500);
+        return {
+          error:
+            error instanceof Error ? error.message : 'Failed to get balance',
+        };
       }
-    );
-  });
+    }
+  );
 }

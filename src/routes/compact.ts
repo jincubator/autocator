@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { getAddress } from 'viem/utils';
 import {
   submitCompact,
   getCompactsByAddress,
@@ -6,7 +7,6 @@ import {
   type CompactSubmission,
   type StoredCompactMessage,
 } from '../compact';
-import { createAuthMiddleware } from './session';
 import { generateNonce } from '../validation';
 
 // Type for serialized response
@@ -48,44 +48,44 @@ function serializeCompactMessage(
 export async function setupCompactRoutes(
   server: FastifyInstance
 ): Promise<void> {
-  const authenticateRequest = createAuthMiddleware(server);
-
-  // Get suggested nonce for a chain
+  // Get suggested nonce for a chain and sponsor
   server.get<{
     Params: { chainId: string };
+    Querystring: { sponsor: string };
   }>(
     '/suggested-nonce/:chainId',
-    {
-      preHandler: authenticateRequest,
-    },
     async (
       request: FastifyRequest<{
         Params: { chainId: string };
+        Querystring: { sponsor: string };
       }>,
       reply: FastifyReply
     ) => {
-      if (!request.session) {
-        reply.code(401);
-        return { error: 'Unauthorized' };
-      }
-
       try {
         const { chainId } = request.params;
-        const sponsor = request.session.address;
+        const { sponsor } = request.query;
+        
+        if (!sponsor) {
+          reply.code(400);
+          return { error: 'Sponsor address is required' };
+        }
+        
+        let normalizedSponsor: string;
+        try {
+          normalizedSponsor = getAddress(sponsor);
+        } catch (error) {
+          reply.code(400);
+          return { error: 'Invalid sponsor address format' };
+        }
 
         // Generate a nonce for the sponsor
-        const nonce = await generateNonce(sponsor, chainId, server.db);
+        const nonce = await generateNonce(normalizedSponsor, chainId, server.db);
 
         // Return the nonce in hex format with 0x prefix
         return {
           nonce: '0x' + nonce.toString(16).padStart(64, '0'),
         };
       } catch (error) {
-        server.log.error({
-          msg: 'Failed to generate nonce',
-          err: error instanceof Error ? error.message : String(error),
-          path: request.url,
-        });
         reply.code(500);
         return {
           error:
@@ -95,41 +95,36 @@ export async function setupCompactRoutes(
     }
   );
 
-  // Submit a new compact
+  // Submit a new compact with sponsor signature
   server.post<{
-    Body: CompactSubmission;
+    Body: CompactSubmission & { sponsorSignature: string };
   }>(
     '/compact',
-    {
-      preHandler: authenticateRequest,
-    },
     async (
       request: FastifyRequest<{
-        Body: CompactSubmission;
+        Body: CompactSubmission & { sponsorSignature: string };
       }>,
       reply: FastifyReply
     ) => {
-      if (!request.session) {
-        reply.code(401);
-        return { error: 'Unauthorized' };
-      }
-
       try {
+        const { sponsorSignature, ...submission } = request.body;
+        
+        if (!sponsorSignature) {
+          reply.code(400);
+          return { error: 'Sponsor signature is required' };
+        }
+
         // Return the result directly without wrapping it
         return await submitCompact(
           server,
-          request.body,
-          request.session.address
+          submission,
+          submission.compact.sponsor,
+          sponsorSignature
         );
       } catch (error) {
-        server.log.error({
-          msg: 'Failed to submit compact',
-          err: error instanceof Error ? error.message : String(error),
-          path: request.url,
-        });
         if (
           error instanceof Error &&
-          error.message.includes('Sponsor address does not match')
+          error.message.includes('Invalid sponsor signature')
         ) {
           reply.code(403);
         } else {
@@ -143,26 +138,46 @@ export async function setupCompactRoutes(
     }
   );
 
-  // Get compacts for authenticated user
-  server.get(
+  // Get compacts for a specific sponsor
+  server.get<{
+    Querystring: { sponsor: string };
+  }>(
     '/compacts',
-    {
-      preHandler: authenticateRequest,
-    },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      if (!request.session) {
-        reply.code(401);
-        return { error: 'Unauthorized' };
-      }
-
+    async (
+      request: FastifyRequest<{
+        Querystring: { sponsor: string };
+      }>,
+      reply: FastifyReply
+    ) => {
       try {
-        return await getCompactsByAddress(server, request.session.address);
+        const { sponsor } = request.query;
+        
+        if (!sponsor) {
+          reply.code(400);
+          return { error: 'Sponsor address is required' };
+        }
+        
+        let normalizedSponsor: string;
+        try {
+          normalizedSponsor = getAddress(sponsor);
+        } catch (error) {
+          reply.code(400);
+          return { error: 'Invalid sponsor address format' };
+        }
+
+        const compacts = await getCompactsByAddress(server, normalizedSponsor);
+        
+        // Serialize BigInt values to strings for JSON serialization
+        const serializedCompacts = compacts.map(compact => ({
+          chainId: compact.chainId,
+          compact: serializeCompactMessage(compact.compact),
+          hash: compact.hash,
+          signature: compact.signature,
+          createdAt: compact.createdAt,
+        }));
+
+        return serializedCompacts;
       } catch (error) {
-        server.log.error({
-          msg: 'Failed to get compacts',
-          err: error instanceof Error ? error.message : String(error),
-          path: request.url,
-        });
         if (
           error instanceof Error &&
           error.message.includes('No compacts found')
@@ -184,9 +199,6 @@ export async function setupCompactRoutes(
     Params: { chainId: string; claimHash: string };
   }>(
     '/compact/:chainId/:claimHash',
-    {
-      preHandler: authenticateRequest,
-    },
     async (
       request: FastifyRequest<{
         Params: { chainId: string; claimHash: string };
@@ -213,11 +225,6 @@ export async function setupCompactRoutes(
 
         return serializedCompact;
       } catch (error) {
-        server.log.error({
-          msg: 'Failed to get compact',
-          err: error instanceof Error ? error.message : String(error),
-          path: request.url,
-        });
         reply.code(500);
         return {
           error:

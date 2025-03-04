@@ -1,29 +1,6 @@
 import { PGlite } from '@electric-sql/pglite';
 
 export const schemas = {
-  sessions: `
-    CREATE TABLE IF NOT EXISTS sessions (
-      id UUID PRIMARY KEY,
-      address bytea NOT NULL CHECK (length(address) = 20),
-      nonce TEXT NOT NULL,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-      domain TEXT NOT NULL
-    )
-  `,
-  session_requests: `
-    CREATE TABLE IF NOT EXISTS session_requests (
-      id UUID PRIMARY KEY,
-      address bytea NOT NULL CHECK (length(address) = 20),
-      nonce TEXT NOT NULL,
-      domain TEXT NOT NULL,
-      chain_id bigint NOT NULL,
-      issued_at TIMESTAMP WITH TIME ZONE NOT NULL,
-      expiration_time TIMESTAMP WITH TIME ZONE NOT NULL,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-      used BOOLEAN DEFAULT FALSE
-    )
-  `,
   compacts: `
     CREATE TABLE IF NOT EXISTS compacts (
       id UUID PRIMARY KEY,
@@ -56,14 +33,6 @@ export const schemas = {
 };
 
 export const indexes = {
-  sessions: [
-    'CREATE INDEX IF NOT EXISTS idx_sessions_address ON sessions(address)',
-    'CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)',
-  ],
-  session_requests: [
-    'CREATE INDEX IF NOT EXISTS idx_session_requests_address ON session_requests(address)',
-    'CREATE INDEX IF NOT EXISTS idx_session_requests_expiration_time ON session_requests(expiration_time)',
-  ],
   compacts: [
     'CREATE INDEX IF NOT EXISTS idx_compacts_sponsor ON compacts(sponsor)',
     'CREATE INDEX IF NOT EXISTS idx_compacts_chain_claim ON compacts(chain_id, claim_hash)',

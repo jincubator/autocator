@@ -3,7 +3,7 @@ import {
   createTestServer,
   getFreshCompact,
   cleanupTestServer,
-  generateSignature,
+  validPayload,
 } from '../utils/test-server';
 import {
   graphqlClient,
@@ -15,10 +15,10 @@ import {
 } from '../../graphql';
 import { RequestDocument, Variables, RequestOptions } from 'graphql-request';
 
-describe('Protected Routes', () => {
+describe('Balance Routes', () => {
   let server: FastifyInstance;
-  let sessionId: string;
   let originalRequest: typeof graphqlClient.request;
+  const sponsorAddress = validPayload.address;
 
   beforeEach(async () => {
     server = await createTestServer();
@@ -78,42 +78,6 @@ describe('Protected Routes', () => {
     await fetchAndCacheSupportedChains(
       '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
     );
-
-    // First get a session request
-    const address = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
-    const sessionResponse = await server.inject({
-      method: 'GET',
-      url: `/session/1/${address}`,
-    });
-
-    expect(sessionResponse.statusCode).toBe(200);
-    const sessionRequest = JSON.parse(sessionResponse.payload);
-
-    // Normalize timestamps to match database precision
-    const payload = {
-      ...sessionRequest.session,
-      issuedAt: new Date(sessionRequest.session.issuedAt).toISOString(),
-      expirationTime: new Date(
-        sessionRequest.session.expirationTime
-      ).toISOString(),
-    };
-
-    // Create a valid session to use in tests
-    const signature = await generateSignature(payload);
-    const response = await server.inject({
-      method: 'POST',
-      url: '/session',
-      payload: {
-        payload,
-        signature,
-      },
-    });
-
-    const result = JSON.parse(response.payload);
-    if (!result.session?.id) {
-      throw new Error('Failed to create session: ' + JSON.stringify(result));
-    }
-    sessionId = result.session.id;
   });
 
   afterEach(async () => {
@@ -129,10 +93,7 @@ describe('Protected Routes', () => {
 
       const response = await server.inject({
         method: 'GET',
-        url: `/balance/1/${lockId}`,
-        headers: {
-          'x-session-id': sessionId,
-        },
+        url: `/balance/1/${lockId}?sponsor=${sponsorAddress}`,
       });
 
       expect(response.statusCode).toBe(200);
@@ -149,7 +110,7 @@ describe('Protected Routes', () => {
       expect(typeof result.withdrawalStatus).toBe('number');
     });
 
-    it('should return 401 without session', async () => {
+    it('should return 400 without sponsor', async () => {
       const freshCompact = getFreshCompact();
       const lockId = freshCompact.id.toString();
 
@@ -158,7 +119,9 @@ describe('Protected Routes', () => {
         url: `/balance/1/${lockId}`,
       });
 
-      expect(response.statusCode).toBe(401);
+      expect(response.statusCode).toBe(400);
+      const result = JSON.parse(response.payload);
+      expect(result.error).toBe('Sponsor address is required');
     });
 
     it('should return 404 for non-existent lock', async () => {
@@ -211,10 +174,7 @@ describe('Protected Routes', () => {
       try {
         const response = await server.inject({
           method: 'GET',
-          url: '/balance/1/0x0000000000000000000000000000000000000000000000000000000000000000',
-          headers: {
-            'x-session-id': sessionId,
-          },
+          url: `/balance/1/0x0000000000000000000000000000000000000000000000000000000000000000?sponsor=${sponsorAddress}`,
         });
 
         expect(response.statusCode).toBe(404);
@@ -282,10 +242,7 @@ describe('Protected Routes', () => {
 
         const response = await server.inject({
           method: 'GET',
-          url: `/balance/1/${lockId}`,
-          headers: {
-            'x-session-id': sessionId,
-          },
+          url: `/balance/1/${lockId}?sponsor=${sponsorAddress}`,
         });
 
         expect(response.statusCode).toBe(200);
@@ -387,10 +344,7 @@ describe('Protected Routes', () => {
       try {
         const response = await server.inject({
           method: 'GET',
-          url: '/balances',
-          headers: {
-            'x-session-id': sessionId,
-          },
+          url: `/balances?sponsor=${sponsorAddress}`,
         });
 
         expect(response.statusCode).toBe(200);
@@ -413,13 +367,15 @@ describe('Protected Routes', () => {
       }
     });
 
-    it('should return 401 without session', async () => {
+    it('should return 400 without sponsor', async () => {
       const response = await server.inject({
         method: 'GET',
         url: '/balances',
       });
 
-      expect(response.statusCode).toBe(401);
+      expect(response.statusCode).toBe(400);
+      const result = JSON.parse(response.payload);
+      expect(result.error).toBe('Sponsor address is required');
     });
 
     it('should handle case when no resource locks exist', async () => {
@@ -466,10 +422,7 @@ describe('Protected Routes', () => {
       try {
         const response = await server.inject({
           method: 'GET',
-          url: '/balances',
-          headers: {
-            'x-session-id': sessionId,
-          },
+          url: `/balances?sponsor=${sponsorAddress}`,
         });
 
         expect(response.statusCode).toBe(200);

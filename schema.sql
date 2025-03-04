@@ -1,29 +1,6 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Sessions table for managing user authentication
-CREATE TABLE sessions (
-    id UUID PRIMARY KEY,
-    address bytea NOT NULL CHECK (length(address) = 20),
-    nonce TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    domain TEXT NOT NULL
-);
-
--- Session requests table
-CREATE TABLE session_requests (
-    id UUID PRIMARY KEY,
-    address bytea NOT NULL CHECK (length(address) = 20),
-    nonce TEXT NOT NULL,
-    domain TEXT NOT NULL,
-    chain_id bigint NOT NULL,
-    issued_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    expiration_time TIMESTAMP WITH TIME ZONE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    used BOOLEAN DEFAULT FALSE
-);
-
 -- Compacts table for storing compact messages and their metadata
 CREATE TABLE compacts (
     id UUID PRIMARY KEY,
@@ -54,10 +31,6 @@ CREATE TABLE nonces (
 );
 
 -- Create indexes for common query patterns
-CREATE INDEX idx_sessions_address ON sessions(address);
-CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);
-CREATE INDEX idx_session_requests_address ON session_requests(address);
-CREATE INDEX idx_session_requests_expiration_time ON session_requests(expiration_time);
 CREATE INDEX idx_compacts_sponsor ON compacts(sponsor);
 CREATE INDEX idx_compacts_chain_claim ON compacts(chain_id, claim_hash);
 CREATE INDEX idx_nonces_chain_sponsor ON nonces(chain_id, sponsor);

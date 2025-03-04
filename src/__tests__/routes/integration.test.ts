@@ -13,10 +13,12 @@ import {
   AccountResponse,
   fetchAndCacheSupportedChains,
 } from '../../graphql';
+import { signMessage } from 'viem/accounts';
 
 describe('Integration Tests', () => {
   let server: FastifyInstance;
   let originalRequest: typeof graphqlClient.request;
+  const sponsorAddress = validPayload.address;
 
   beforeEach(async () => {
     server = await createTestServer();
@@ -31,8 +33,22 @@ describe('Integration Tests', () => {
     graphqlClient.request = originalRequest;
   });
 
+  // Helper to generate sponsor signature for a compact
+  async function generateSponsorSignature(compact: any, chainId: string): Promise<string> {
+    // Create a message that includes the compact details
+    const message = `I am signing this compact with:
+Arbiter: ${compact.arbiter}
+Sponsor: ${compact.sponsor}
+ID: ${compact.id}
+Amount: ${compact.amount}
+Expires: ${compact.expires}
+Chain ID: ${chainId}`;
+    
+    return await generateSignature(message);
+  }
+
   describe('Allocation Flow', () => {
-    it('should handle complete allocation flow: session -> compact -> balance -> nonce', async () => {
+    it('should handle complete allocation flow: compact -> balance -> nonce', async () => {
       // Mock GraphQL response with zero allocated balance
       graphqlClient.request = async (): Promise<
         AccountDeltasResponse & AccountResponse
@@ -55,62 +71,37 @@ describe('Integration Tests', () => {
         },
       });
 
-      // 1. Create session
-      const sessionResponse = await server.inject({
-        method: 'GET',
-        url: `/session/1/${validPayload.address}`,
-      });
-      expect(sessionResponse.statusCode).toBe(200);
-      const sessionRequest = JSON.parse(sessionResponse.payload);
-
-      const payload = {
-        ...sessionRequest.session,
-        issuedAt: new Date(sessionRequest.session.issuedAt).toISOString(),
-        expirationTime: new Date(
-          sessionRequest.session.expirationTime
-        ).toISOString(),
-      };
-
-      const signature = await generateSignature(payload);
-      const createSessionResponse = await server.inject({
-        method: 'POST',
-        url: '/session',
-        payload: { payload, signature },
-      });
-      expect(createSessionResponse.statusCode).toBe(200);
-      const { session } = JSON.parse(createSessionResponse.payload);
-      const sessionId = session.id;
-
-      // 2. Get initial balance
+      // 1. Get initial balance
       const freshCompact = getFreshCompact();
       const initialBalanceResponse = await server.inject({
         method: 'GET',
-        url: `/balance/1/${freshCompact.id}`,
-        headers: { 'x-session-id': sessionId },
+        url: `/balance/1/${freshCompact.id}?sponsor=${sponsorAddress}`,
       });
       expect(initialBalanceResponse.statusCode).toBe(200);
       const initialBalance = JSON.parse(initialBalanceResponse.payload);
       expect(initialBalance.allocatedBalance).toBe('0');
 
-      // 3. Get initial suggested nonce
+      // 2. Get initial suggested nonce
       const initialNonceResponse = await server.inject({
         method: 'GET',
-        url: '/suggested-nonce/1',
-        headers: { 'x-session-id': sessionId },
+        url: `/suggested-nonce/1?sponsor=${sponsorAddress}`,
       });
       expect(initialNonceResponse.statusCode).toBe(200);
       const { nonce: initialNonce } = JSON.parse(initialNonceResponse.payload);
 
-      // 4. Submit compact
+      // 3. Submit compact
+      const compactData = compactToAPI(freshCompact);
+      const sponsorSignature = await generateSponsorSignature(compactData, '1');
+      
       const compactPayload = {
         chainId: '1',
-        compact: compactToAPI(freshCompact),
+        compact: compactData,
+        sponsorSignature,
       };
 
       const submitResponse = await server.inject({
         method: 'POST',
         url: '/compact',
-        headers: { 'x-session-id': sessionId },
         payload: compactPayload,
       });
       expect(submitResponse.statusCode).toBe(200);
@@ -136,11 +127,10 @@ describe('Integration Tests', () => {
         FROM compacts
       `);
 
-      // 5. Verify updated balance
+      // 4. Verify updated balance
       const updatedBalanceResponse = await server.inject({
         method: 'GET',
-        url: `/balance/1/${freshCompact.id}`,
-        headers: { 'x-session-id': sessionId },
+        url: `/balance/1/${freshCompact.id}?sponsor=${sponsorAddress}`,
       });
       expect(updatedBalanceResponse.statusCode).toBe(200);
       const updatedBalance = JSON.parse(updatedBalanceResponse.payload);
@@ -148,11 +138,10 @@ describe('Integration Tests', () => {
         freshCompact.amount.toString()
       );
 
-      // 6. Verify next suggested nonce is incremented
+      // 5. Verify next suggested nonce is incremented
       const nextNonceResponse = await server.inject({
         method: 'GET',
-        url: '/suggested-nonce/1',
-        headers: { 'x-session-id': sessionId },
+        url: `/suggested-nonce/1?sponsor=${sponsorAddress}`,
       });
       expect(nextNonceResponse.statusCode).toBe(200);
       const { nonce: nextNonce } = JSON.parse(nextNonceResponse.payload);
