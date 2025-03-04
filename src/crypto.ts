@@ -8,9 +8,8 @@ import {
   getAddress,
   signatureToCompactSignature,
 } from 'viem';
-import { privateKeyToAccount, signMessage, sign } from 'viem/accounts';
+import { privateKeyToAccount, sign } from 'viem/accounts';
 import { type StoredCompactMessage } from './compact';
-import { type SessionPayload } from './session';
 
 // EIP-712 domain for The Compact
 const DOMAIN = {
@@ -198,34 +197,4 @@ export function verifySigningAddress(configuredAddress: string): void {
         `actual signing address ${normalizedActual}`
     );
   }
-}
-
-export async function generateSignature(
-  payload: SessionPayload | string
-): Promise<string> {
-  // If payload is a string, use it directly as the message
-  const message =
-    typeof payload === 'string'
-      ? payload
-      : [
-          `${payload.domain} wants you to sign in with your Ethereum account:`,
-          payload.address,
-          '',
-          payload.statement,
-          '',
-          `URI: ${payload.uri}`,
-          `Version: ${payload.version}`,
-          `Chain ID: ${payload.chainId}`,
-          `Nonce: ${payload.nonce}`,
-          `Issued At: ${payload.issuedAt}`,
-          `Expiration Time: ${payload.expirationTime}`,
-        ].join('\n');
-
-  // Sign the message using the private key directly
-  const signature = await signMessage({
-    message,
-    privateKey,
-  });
-
-  return signature;
 }
