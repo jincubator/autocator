@@ -6,6 +6,7 @@ import {
   cleanupTestServer,
   compactToAPI,
   generateSignature,
+  generateValidCompactSignature,
 } from '../utils/test-server';
 import {
   graphqlClient,
@@ -67,26 +68,26 @@ describe('Compact Routes', () => {
     graphqlClient.request = originalRequest;
   });
 
-  // Helper to generate sponsor signature for a compact
-  async function generateSponsorSignature(compact: any, chainId: string): Promise<string> {
-    // Create a message that includes the compact details
-    const message = `I am signing this compact with:
-Arbiter: ${compact.arbiter}
-Sponsor: ${compact.sponsor}
-ID: ${compact.id}
-Amount: ${compact.amount}
-Expires: ${compact.expires}
-Chain ID: ${chainId}`;
-    
-    return await generateSignature(message);
+  // Helper to convert API compact to the format expected by generateValidCompactSignature
+  function apiCompactToStoredCompact(compact: any): any {
+    return {
+      id: BigInt(compact.id),
+      arbiter: compact.arbiter,
+      sponsor: compact.sponsor,
+      nonce: BigInt(compact.nonce),
+      expires: BigInt(compact.expires),
+      amount: compact.amount,
+      witnessTypeString: compact.witnessTypeString,
+      witnessHash: compact.witnessHash,
+    };
   }
 
-  describe('GET /suggested-nonce/:chainId', () => {
-    it('should return a valid nonce for a sponsor', async () => {
+  describe('GET /suggested-nonce/:chainId/:account', () => {
+    it('should return a valid nonce for an account', async () => {
       const sponsorAddress = validPayload.address;
       const response = await server.inject({
         method: 'GET',
-        url: `/suggested-nonce/1?sponsor=${sponsorAddress}`,
+        url: `/suggested-nonce/1/${sponsorAddress}`,
       });
 
       expect(response.statusCode).toBe(200);
@@ -100,15 +101,15 @@ Chain ID: ${chainId}`;
       expect(nonceHex.slice(0, 40)).toBe(sponsorHex);
     });
 
-    it('should reject request without sponsor', async () => {
+    it('should reject request with invalid account address', async () => {
       const response = await server.inject({
         method: 'GET',
-        url: '/suggested-nonce/1',
+        url: '/suggested-nonce/1/0xinvalid',
       });
 
       expect(response.statusCode).toBe(400);
       const result = JSON.parse(response.payload);
-      expect(result.error).toBe('Sponsor address is required');
+      expect(result.error).toBe('Invalid account address format');
     });
   });
 
@@ -116,7 +117,8 @@ Chain ID: ${chainId}`;
     it('should submit valid compact with sponsor signature', async () => {
       const freshCompact = getFreshCompact();
       const compactData = compactToAPI(freshCompact);
-      const sponsorSignature = await generateSponsorSignature(compactData, '1');
+      const storedCompact = apiCompactToStoredCompact(compactData);
+      const sponsorSignature = await generateValidCompactSignature(storedCompact, '1');
       
       const compactPayload = {
         chainId: '1',
@@ -170,7 +172,8 @@ Chain ID: ${chainId}`;
         id: freshCompact.id.toString(10), // Convert id to base 10 string
       };
       
-      const sponsorSignature = await generateSponsorSignature(compactData, '1');
+      const storedCompact = apiCompactToStoredCompact(compactData);
+      const sponsorSignature = await generateValidCompactSignature(storedCompact, '1');
 
       const response = await server.inject({
         method: 'POST',
@@ -200,7 +203,8 @@ Chain ID: ${chainId}`;
         nonce: '0x' + freshCompact.nonce.toString(16),
       };
       
-      const sponsorSignature = await generateSponsorSignature(hexCompact, '1');
+      const storedCompact = apiCompactToStoredCompact(hexCompact);
+      const sponsorSignature = await generateValidCompactSignature(storedCompact, '1');
 
       const response = await server.inject({
         method: 'POST',
@@ -230,7 +234,8 @@ Chain ID: ${chainId}`;
         nonce: freshCompact.nonce.toString(),
       };
       
-      const sponsorSignature = await generateSponsorSignature(mixedCompact, '1');
+      const storedCompact = apiCompactToStoredCompact(mixedCompact);
+      const sponsorSignature = await generateValidCompactSignature(storedCompact, '1');
 
       const response = await server.inject({
         method: 'POST',
@@ -257,10 +262,13 @@ Chain ID: ${chainId}`;
         id: '0xInvalidHex',
       };
       
-      const sponsorSignature = await generateSponsorSignature(
-        { ...invalidHexCompact, id: '0x123' }, // Use valid ID for signature
-        '1'
-      );
+      // Use valid ID for signature
+      const validCompactForSig = {
+        ...invalidHexCompact,
+        id: '0x123'
+      };
+      const storedCompact = apiCompactToStoredCompact(validCompactForSig);
+      const sponsorSignature = await generateValidCompactSignature(storedCompact, '1');
 
       const response = await server.inject({
         method: 'POST',
@@ -277,14 +285,18 @@ Chain ID: ${chainId}`;
       expect(result.error).toContain('Failed to convert id');
     });
 
-    it('should handle null nonce by generating one', async () => {
+    it('should reject compact with null nonce', async () => {
       const freshCompact = getFreshCompact();
       const compactData = {
         ...compactToAPI(freshCompact),
         nonce: null,
       };
       
-      const sponsorSignature = await generateSponsorSignature(compactData, '1');
+      const storedCompact = apiCompactToStoredCompact({
+        ...compactData,
+        nonce: '0x1' // Use a valid nonce for signature generation
+      });
+      const sponsorSignature = await generateValidCompactSignature(storedCompact, '1');
       
       const compactPayload = {
         chainId: '1',
@@ -298,22 +310,17 @@ Chain ID: ${chainId}`;
         payload: compactPayload,
       });
 
-      expect(response.statusCode).toBe(200);
+      expect(response.statusCode).toBe(400);
       const result = JSON.parse(response.payload);
-      expect(result).toHaveProperty('hash');
-      expect(result).toHaveProperty('signature');
-      expect(result).toHaveProperty('nonce');
-      // Verify nonce format: first 20 bytes should match sponsor address
-      const nonceHex = BigInt(result.nonce).toString(16).padStart(64, '0');
-      const sponsorHex = freshCompact.sponsor.toLowerCase().slice(2);
-      expect(nonceHex.slice(0, 40)).toBe(sponsorHex);
+      expect(result.error).toBe('Nonce is required. Use /suggested-nonce/:chainId to get a valid nonce.');
     });
 
     it('should store nonce after successful submission', async (): Promise<void> => {
       const freshCompact = getFreshCompact();
       const chainId = '1';
       const compactData = compactToAPI(freshCompact);
-      const sponsorSignature = await generateSponsorSignature(compactData, chainId);
+      const storedCompact = apiCompactToStoredCompact(compactData);
+      const sponsorSignature = await generateValidCompactSignature(storedCompact, chainId);
 
       // Submit compact
       const response = await server.inject({
@@ -355,7 +362,8 @@ Chain ID: ${chainId}`;
       // First submit a compact to ensure there's data
       const freshCompact = getFreshCompact();
       const compactData = compactToAPI(freshCompact);
-      const sponsorSignature = await generateSponsorSignature(compactData, '1');
+      const storedCompact = apiCompactToStoredCompact(compactData);
+      const sponsorSignature = await generateValidCompactSignature(storedCompact, '1');
       
       await server.inject({
         method: 'POST',
@@ -394,7 +402,8 @@ Chain ID: ${chainId}`;
     it('should return specific compact', async () => {
       const freshCompact = getFreshCompact();
       const compactData = compactToAPI(freshCompact);
-      const sponsorSignature = await generateSponsorSignature(compactData, '1');
+      const storedCompact = apiCompactToStoredCompact(compactData);
+      const sponsorSignature = await generateValidCompactSignature(storedCompact, '1');
       
       // First submit a compact
       const submitResponse = await server.inject({

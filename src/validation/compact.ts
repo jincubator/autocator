@@ -33,16 +33,21 @@ export async function validateCompact(
 
     const validatedCompact = structureResult.validatedCompact;
 
-    // 3. Nonce Validation (only if nonce is provided)
-    if (validatedCompact.nonce !== null) {
-      const nonceResult = await validateNonce(
-        validatedCompact.nonce,
-        validatedCompact.sponsor,
-        chainId,
-        db
-      );
-      if (!nonceResult.isValid) return nonceResult;
+    // 3. Nonce Validation (nonce is required)
+    if (validatedCompact.nonce === null) {
+      return { 
+        isValid: false, 
+        error: 'Nonce is required. Use /suggested-nonce/:chainId to get a valid nonce.' 
+      };
     }
+    
+    const nonceResult = await validateNonce(
+      validatedCompact.nonce,
+      validatedCompact.sponsor,
+      chainId,
+      db
+    );
+    if (!nonceResult.isValid) return nonceResult;
 
     // 4. Expiration Validation
     const expirationResult = validateExpiration(validatedCompact.expires);

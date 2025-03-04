@@ -14,7 +14,7 @@ export interface CompactMessage {
 export interface ValidatedCompactMessage {
   arbiter: string;
   sponsor: string;
-  nonce: bigint | null;
+  nonce: bigint;
   expires: bigint;
   id: bigint;
   amount: string;

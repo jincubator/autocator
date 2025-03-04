@@ -4,7 +4,7 @@ import {
   validPayload,
   getFreshCompact,
   cleanupTestServer,
-  generateSignature,
+  generateValidCompactSignature,
   compactToAPI,
 } from '../utils/test-server';
 import {
@@ -33,22 +33,22 @@ describe('Integration Tests', () => {
     graphqlClient.request = originalRequest;
   });
 
-  // Helper to generate sponsor signature for a compact
-  async function generateSponsorSignature(compact: any, chainId: string): Promise<string> {
-    // Create a message that includes the compact details
-    const message = `I am signing this compact with:
-Arbiter: ${compact.arbiter}
-Sponsor: ${compact.sponsor}
-ID: ${compact.id}
-Amount: ${compact.amount}
-Expires: ${compact.expires}
-Chain ID: ${chainId}`;
-    
-    return await generateSignature(message);
+  // Helper to convert API compact to the format expected by generateValidCompactSignature
+  function apiCompactToStoredCompact(compact: any): any {
+    return {
+      id: BigInt(compact.id),
+      arbiter: compact.arbiter,
+      sponsor: compact.sponsor,
+      nonce: BigInt(compact.nonce),
+      expires: BigInt(compact.expires),
+      amount: compact.amount,
+      witnessTypeString: compact.witnessTypeString,
+      witnessHash: compact.witnessHash,
+    };
   }
 
   describe('Allocation Flow', () => {
-    it('should handle complete allocation flow: compact -> balance -> nonce', async () => {
+    it('should handle complete allocation flow: nonce -> compact -> balance', async () => {
       // Mock GraphQL response with zero allocated balance
       graphqlClient.request = async (): Promise<
         AccountDeltasResponse & AccountResponse
@@ -71,27 +71,20 @@ Chain ID: ${chainId}`;
         },
       });
 
-      // 1. Get initial balance
       const freshCompact = getFreshCompact();
-      const initialBalanceResponse = await server.inject({
-        method: 'GET',
-        url: `/balance/1/${freshCompact.id}?sponsor=${sponsorAddress}`,
-      });
-      expect(initialBalanceResponse.statusCode).toBe(200);
-      const initialBalance = JSON.parse(initialBalanceResponse.payload);
-      expect(initialBalance.allocatedBalance).toBe('0');
-
-      // 2. Get initial suggested nonce
+      
+      // 1. Get initial suggested nonce
       const initialNonceResponse = await server.inject({
         method: 'GET',
-        url: `/suggested-nonce/1?sponsor=${sponsorAddress}`,
+        url: `/suggested-nonce/1/${sponsorAddress}`,
       });
       expect(initialNonceResponse.statusCode).toBe(200);
       const { nonce: initialNonce } = JSON.parse(initialNonceResponse.payload);
 
-      // 3. Submit compact
+      // 2. Submit compact
       const compactData = compactToAPI(freshCompact);
-      const sponsorSignature = await generateSponsorSignature(compactData, '1');
+      const storedCompact = apiCompactToStoredCompact(compactData);
+      const sponsorSignature = await generateValidCompactSignature(storedCompact, '1');
       
       const compactPayload = {
         chainId: '1',
@@ -127,7 +120,7 @@ Chain ID: ${chainId}`;
         FROM compacts
       `);
 
-      // 4. Verify updated balance
+      // 3. Verify updated balance
       const updatedBalanceResponse = await server.inject({
         method: 'GET',
         url: `/balance/1/${freshCompact.id}?sponsor=${sponsorAddress}`,
@@ -138,10 +131,10 @@ Chain ID: ${chainId}`;
         freshCompact.amount.toString()
       );
 
-      // 5. Verify next suggested nonce is incremented
+      // 4. Verify next suggested nonce is incremented
       const nextNonceResponse = await server.inject({
         method: 'GET',
-        url: `/suggested-nonce/1?sponsor=${sponsorAddress}`,
+        url: `/suggested-nonce/1/${sponsorAddress}`,
       });
       expect(nextNonceResponse.statusCode).toBe(200);
       const { nonce: nextNonce } = JSON.parse(nextNonceResponse.payload);

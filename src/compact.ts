@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { type Hex } from 'viem';
+import { type Hex, recoverAddress, parseCompactSignature, compactSignatureToSignature, serializeSignature } from 'viem';
 import { getAddress, hexToBytes, toHex, numberToHex } from 'viem/utils';
 import {
   validateCompact,
@@ -8,7 +8,7 @@ import {
   storeNonce,
   generateNonce,
 } from './validation';
-import { signCompact } from './crypto';
+import { signCompact, generateClaimHash, generateDomainHash, generateDigest } from './crypto';
 import { randomUUID } from 'crypto';
 import { PGlite } from '@electric-sql/pglite';
 
@@ -72,7 +72,7 @@ function bytesToAmount(bytes: Uint8Array): string {
 
 // Helper to convert ValidatedCompactMessage to StoredCompactMessage
 function toStoredCompact(
-  compact: ValidatedCompactMessage & { nonce: bigint }
+  compact: ValidatedCompactMessage
 ): StoredCompactMessage {
   return {
     id: compact.id,
@@ -104,29 +104,14 @@ export async function submitCompact(
       throw new Error('Sponsor address does not match compact');
     }
     
-    // TODO: Implement proper sponsor signature verification
-    // For now, just check that a signature was provided
-    if (!sponsorSignature || !sponsorSignature.startsWith('0x')) {
-      throw new Error('Invalid sponsor signature format');
+    // Ensure nonce is provided
+    if (submission.compact.nonce === null) {
+      throw new Error('Nonce is required. Use /suggested-nonce/:chainId to get a valid nonce.');
     }
-
-    // Generate nonce if not provided (do this before validation)
-    const generatedNonce =
-      submission.compact.nonce === null
-        ? await generateNonce(sponsorAddress, submission.chainId, server.db)
-        : null;
-
-    // Update compact with final nonce
-    const compactWithNonce: CompactMessage = {
-      ...submission.compact,
-      nonce: generatedNonce
-        ? generatedNonce.toString()
-        : submission.compact.nonce,
-    };
 
     // Validate the compact (including nonce validation)
     const validationResult = await validateCompact(
-      compactWithNonce,
+      submission.compact,
       submission.chainId,
       server.db
     );
@@ -137,16 +122,49 @@ export async function submitCompact(
     // Get the validated compact with proper types
     const validatedCompact = validationResult.validatedCompact;
 
-    // Ensure nonce is present for storage
-    if (validatedCompact.nonce === null) {
-      throw new Error('Nonce is required for storage');
+    // Convert to StoredCompactMessage for crypto operations
+    const storedCompact = toStoredCompact(validatedCompact);
+
+    // Verify sponsor signature
+    let isSignatureValid = false;
+    let isOnchainRegistration = false;
+
+    if (sponsorSignature && sponsorSignature.startsWith('0x')) {
+      try {
+        // Generate claim hash
+        const claimHash = await generateClaimHash(storedCompact);
+        
+        // Generate domain hash for the specific chain
+        const domainHash = generateDomainHash(BigInt(submission.chainId));
+        
+        // Generate the digest that was signed
+        const digest = generateDigest(claimHash, domainHash);
+        
+        // Convert compact signature to full signature for recovery
+        const parsedCompactSig = parseCompactSignature(sponsorSignature as `0x${string}`);
+        const signature = compactSignatureToSignature(parsedCompactSig);
+        const fullSignature = serializeSignature(signature);
+        
+        // Recover the signer address
+        const recoveredAddress = await recoverAddress({
+          hash: digest,
+          signature: fullSignature,
+        });
+        
+        // Check if the recovered address matches the sponsor
+        isSignatureValid = recoveredAddress.toLowerCase() === normalizedSponsorAddress.toLowerCase();
+      } catch (error) {
+        console.error('Signature verification error:', error);
+        isSignatureValid = false;
+      }
     }
 
-    // Convert to StoredCompactMessage for crypto operations
-    const storedCompact = toStoredCompact({
-      ...validatedCompact,
-      nonce: validatedCompact.nonce,
-    });
+    // If signature is invalid or missing, check for onchain registration
+    if (!isSignatureValid) {
+      // TODO: Implement onchain registration check
+      throw new Error('Invalid sponsor signature. Onchain registration check not yet implemented.');
+    }
+
 
     // Sign the compact and get claim hash
     const { hash, signature: signaturePromise } = await signCompact(

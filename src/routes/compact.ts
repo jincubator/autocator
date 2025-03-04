@@ -48,38 +48,30 @@ function serializeCompactMessage(
 export async function setupCompactRoutes(
   server: FastifyInstance
 ): Promise<void> {
-  // Get suggested nonce for a chain and sponsor
+  // Get suggested nonce for a chain and account
   server.get<{
-    Params: { chainId: string };
-    Querystring: { sponsor: string };
+    Params: { chainId: string; account: string };
   }>(
-    '/suggested-nonce/:chainId',
+    '/suggested-nonce/:chainId/:account',
     async (
       request: FastifyRequest<{
-        Params: { chainId: string };
-        Querystring: { sponsor: string };
+        Params: { chainId: string; account: string };
       }>,
       reply: FastifyReply
     ) => {
       try {
-        const { chainId } = request.params;
-        const { sponsor } = request.query;
+        const { chainId, account } = request.params;
         
-        if (!sponsor) {
-          reply.code(400);
-          return { error: 'Sponsor address is required' };
-        }
-        
-        let normalizedSponsor: string;
+        let normalizedAccount: string;
         try {
-          normalizedSponsor = getAddress(sponsor);
+          normalizedAccount = getAddress(account);
         } catch (error) {
           reply.code(400);
-          return { error: 'Invalid sponsor address format' };
+          return { error: 'Invalid account address format' };
         }
 
-        // Generate a nonce for the sponsor
-        const nonce = await generateNonce(normalizedSponsor, chainId, server.db);
+        // Generate a nonce for the account
+        const nonce = await generateNonce(normalizedAccount, chainId, server.db);
 
         // Return the nonce in hex format with 0x prefix
         return {
@@ -127,6 +119,11 @@ export async function setupCompactRoutes(
           error.message.includes('Invalid sponsor signature')
         ) {
           reply.code(403);
+        } else if (
+          error instanceof Error &&
+          error.message.includes('Onchain registration check not yet implemented')
+        ) {
+          reply.code(501); // Not Implemented
         } else {
           reply.code(400);
         }
