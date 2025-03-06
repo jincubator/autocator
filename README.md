@@ -1,4 +1,4 @@
-# $$\mathbf{\color{green}{Auto}cator}$$ 🚗
+# $$\mathbf{\color{green}{Auto}\color{default}{cator}}$$ 🚗
 
 A server-based allocator for [The Compact](https://github.com/Uniswap/the-compact) that leverages protocol signatures and transactions for authentication. Autocator provides an API for requesting resource lock allocations across multiple blockchains by providing the details of associated compacts with accompanying sponsor signatures or onchain registrations. It also includes a frontend application for interacting directly with the server that also facilitates making deposits into resource locks it oversees.
 
