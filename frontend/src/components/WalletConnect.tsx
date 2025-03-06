@@ -1,14 +1,10 @@
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 
-interface WalletConnectProps {
-  hasSession: boolean;
-}
-
-export function WalletConnect({ hasSession }: WalletConnectProps) {
+export function WalletConnect() {
   return (
     <div className="flex items-center justify-end">
       <ConnectButton
-        showBalance={hasSession}
+        showBalance={true}
         accountStatus={{ smallScreen: 'avatar', largeScreen: 'full' }}
         chainStatus={{ smallScreen: 'icon', largeScreen: 'full' }}
       />

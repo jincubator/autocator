@@ -38,12 +38,12 @@ export async function setupBalanceRoutes(
     > => {
       try {
         const { sponsor } = request.query;
-        
+
         if (!sponsor) {
           reply.code(400);
           return { error: 'Sponsor address is required' };
         }
-        
+
         let normalizedSponsor: string;
         try {
           normalizedSponsor = getAddress(sponsor);
@@ -51,7 +51,7 @@ export async function setupBalanceRoutes(
           reply.code(400);
           return { error: 'Invalid sponsor address format' };
         }
-        
+
         // Get all resource locks for the sponsor
         const response = await getAllResourceLocks(normalizedSponsor);
 
@@ -183,12 +183,12 @@ export async function setupBalanceRoutes(
       try {
         const { chainId, lockId } = request.params;
         const { sponsor } = request.query;
-        
+
         if (!sponsor) {
           reply.code(400);
           return { error: 'Sponsor address is required' };
         }
-        
+
         let normalizedSponsor: string;
         try {
           normalizedSponsor = getAddress(sponsor);
@@ -263,8 +263,7 @@ export async function setupBalanceRoutes(
         let balanceAvailableToAllocate = BigInt(0);
         if (resourceLock.withdrawalStatus === 0) {
           if (allocatedBalance < allocatableBalance) {
-            balanceAvailableToAllocate =
-              allocatableBalance - allocatedBalance;
+            balanceAvailableToAllocate = allocatableBalance - allocatedBalance;
           }
         }
 

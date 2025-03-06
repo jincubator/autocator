@@ -5,7 +5,13 @@ import { randomUUID } from 'crypto';
 import { setupRoutes } from '../../routes';
 import { dbManager } from '../setup';
 import { signMessage, sign, privateKeyToAccount } from 'viem/accounts';
-import { getAddress, encodeAbiParameters, keccak256, encodePacked, concat } from 'viem/utils';
+import {
+  getAddress,
+  encodeAbiParameters,
+  keccak256,
+  encodePacked,
+  concat,
+} from 'viem/utils';
 import { serializeCompactSignature, signatureToCompactSignature } from 'viem';
 import { CompactMessage } from '../../validation/types';
 import { setupGraphQLMocks } from './graphql-mock';
@@ -201,7 +207,8 @@ export async function createTestServer(): Promise<FastifyInstance> {
 
     // Set environment variables directly for testing
     process.env.SIGNING_ADDRESS = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
-    process.env.ALLOCATOR_ADDRESS = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
+    process.env.ALLOCATOR_ADDRESS =
+      '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
     process.env.PRIVATE_KEY = TEST_PRIVATE_KEY;
     process.env.DOMAIN = 'autocator.example';
     process.env.BASE_URL = 'https://autocator.example';
@@ -226,17 +233,16 @@ export async function createTestServer(): Promise<FastifyInstance> {
     await setupRoutes(server);
 
     await server.ready();
-    
+
     // Add server to instances array for proper cleanup
     serverInstances.push(server);
-    
+
     return server;
   } catch (err) {
     console.error('Error setting up test server:', err);
     throw err;
   }
 }
-
 
 // Helper to pad hex string to specific byte length
 function padToBytes(hex: string, byteLength: number): string {
@@ -329,7 +335,7 @@ export function compactToAPI(
 export async function cleanupTestServer(): Promise<void> {
   // No need to call dbManager.cleanup() here as it's already called in the global afterEach
   // This prevents double cleanup which might cause issues
-  
+
   // Close all server instances
   for (const server of serverInstances) {
     try {
@@ -338,14 +344,14 @@ export async function cleanupTestServer(): Promise<void> {
       console.error('Error closing server:', err);
     }
   }
-  
+
   // Clear the server instances array
   serverInstances = [];
-  
+
   // Force close any open handles from the logger
   // This is a workaround for the "Jest has detected the following 1 open handle" warning
   process.removeAllListeners('beforeExit');
-  
+
   // Give time for any async operations to complete
-  await new Promise(resolve => setTimeout(resolve, 100));
+  await new Promise((resolve) => setTimeout(resolve, 100));
 }

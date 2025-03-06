@@ -61,7 +61,7 @@ export async function setupCompactRoutes(
     ) => {
       try {
         const { chainId, account } = request.params;
-        
+
         let normalizedAccount: string;
         try {
           normalizedAccount = getAddress(account);
@@ -71,7 +71,11 @@ export async function setupCompactRoutes(
         }
 
         // Generate a nonce for the account
-        const nonce = await generateNonce(normalizedAccount, chainId, server.db);
+        const nonce = await generateNonce(
+          normalizedAccount,
+          chainId,
+          server.db
+        );
 
         // Return the nonce in hex format with 0x prefix
         return {
@@ -100,7 +104,7 @@ export async function setupCompactRoutes(
     ) => {
       try {
         const { sponsorSignature, ...submission } = request.body;
-        
+
         if (!sponsorSignature) {
           reply.code(400);
           return { error: 'Sponsor signature is required' };
@@ -121,7 +125,9 @@ export async function setupCompactRoutes(
           reply.code(403);
         } else if (
           error instanceof Error &&
-          error.message.includes('Onchain registration check not yet implemented')
+          error.message.includes(
+            'Onchain registration check not yet implemented'
+          )
         ) {
           reply.code(501); // Not Implemented
         } else {
@@ -148,12 +154,12 @@ export async function setupCompactRoutes(
     ) => {
       try {
         const { sponsor } = request.query;
-        
+
         if (!sponsor) {
           reply.code(400);
           return { error: 'Sponsor address is required' };
         }
-        
+
         let normalizedSponsor: string;
         try {
           normalizedSponsor = getAddress(sponsor);
@@ -163,9 +169,9 @@ export async function setupCompactRoutes(
         }
 
         const compacts = await getCompactsByAddress(server, normalizedSponsor);
-        
+
         // Serialize BigInt values to strings for JSON serialization
-        const serializedCompacts = compacts.map(compact => ({
+        const serializedCompacts = compacts.map((compact) => ({
           chainId: compact.chainId,
           compact: serializeCompactMessage(compact.compact),
           hash: compact.hash,

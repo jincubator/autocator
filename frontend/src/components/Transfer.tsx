@@ -13,7 +13,6 @@ interface TransferProps {
   };
   tokenSymbol: string;
   withdrawalStatus: number;
-  sessionToken: string | null;
   onForceWithdraw: () => void;
   onDisableForceWithdraw: () => void;
   balanceAvailableToAllocate: string;
@@ -28,7 +27,6 @@ export function Transfer({
   tokenName,
   tokenSymbol,
   withdrawalStatus,
-  sessionToken,
   onForceWithdraw,
   onDisableForceWithdraw,
   balanceAvailableToAllocate,
@@ -64,7 +62,6 @@ export function Transfer({
     tokenName,
     tokenSymbol,
     withdrawalStatus,
-    sessionToken,
     onForceWithdraw,
     onDisableForceWithdraw,
     balanceAvailableToAllocate,

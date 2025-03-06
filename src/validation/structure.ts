@@ -35,10 +35,11 @@ export async function validateStructure(
       if (compact.nonce === null) {
         return {
           isValid: false,
-          error: 'Nonce is required. Use /suggested-nonce/:chainId to get a valid nonce.',
+          error:
+            'Nonce is required. Use /suggested-nonce/:chainId to get a valid nonce.',
         };
       }
-      
+
       // Convert and validate nonce
       const nonce = toPositiveBigInt(compact.nonce, 'nonce');
 

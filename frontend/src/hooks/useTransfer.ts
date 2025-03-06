@@ -44,7 +44,6 @@ export function useTransfer(
   },
   tokenSymbol: string,
   _withdrawalStatus: number,
-  sessionToken: string | null,
   onForceWithdraw: () => void,
   onDisableForceWithdraw: () => void,
   balanceAvailableToAllocate: string,
@@ -371,14 +370,7 @@ export function useTransfer(
   };
 
   const handleRequestAllocation = async () => {
-    if (!isFormValid || !sessionToken || !address) {
-      if (!sessionToken) {
-        showNotification({
-          type: 'error',
-          title: 'Session Required',
-          message: 'Please sign in to request allocation',
-        });
-      }
+    if (!isFormValid || !address) {
       if (!address) {
         showNotification({
           type: 'error',
@@ -407,7 +399,7 @@ export function useTransfer(
         },
       };
 
-      const response = await requestAllocation(params, sessionToken);
+      const response = await requestAllocation(params);
 
       setFormData((prev: FormData) => ({
         ...prev,

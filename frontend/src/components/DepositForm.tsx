@@ -164,17 +164,6 @@ export function DepositForm() {
       return;
     }
 
-    const sessionId = localStorage.getItem(`session-${address}`);
-    if (!sessionId) {
-      showNotification({
-        type: 'error',
-        title: 'Not Signed In',
-        message: 'Please sign in with your Ethereum account',
-        chainId,
-      });
-      return;
-    }
-
     try {
       const hexAllocatorAddress = allocatorAddress as `0x${string}`;
 

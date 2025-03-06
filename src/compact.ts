@@ -1,5 +1,11 @@
 import { FastifyInstance } from 'fastify';
-import { type Hex, recoverAddress, parseCompactSignature, compactSignatureToSignature, serializeSignature } from 'viem';
+import {
+  type Hex,
+  recoverAddress,
+  parseCompactSignature,
+  compactSignatureToSignature,
+  serializeSignature,
+} from 'viem';
 import { getAddress, hexToBytes, toHex, numberToHex } from 'viem/utils';
 import {
   validateCompact,
@@ -10,7 +16,12 @@ import {
   checkOnchainRegistration,
   OnchainRegistrationStatus,
 } from './validation';
-import { signCompact, generateClaimHash, generateDomainHash, generateDigest } from './crypto';
+import {
+  signCompact,
+  generateClaimHash,
+  generateDomainHash,
+  generateDigest,
+} from './crypto';
 import { randomUUID } from 'crypto';
 import { PGlite } from '@electric-sql/pglite';
 
@@ -100,15 +111,17 @@ export async function submitCompact(
 
     // Validate sponsor address format
     const normalizedSponsorAddress = getAddress(sponsorAddress);
-    
+
     // Validate sponsor matches the compact
     if (getAddress(submission.compact.sponsor) !== normalizedSponsorAddress) {
       throw new Error('Sponsor address does not match compact');
     }
-    
+
     // Ensure nonce is provided
     if (submission.compact.nonce === null) {
-      throw new Error('Nonce is required. Use /suggested-nonce/:chainId to get a valid nonce.');
+      throw new Error(
+        'Nonce is required. Use /suggested-nonce/:chainId to get a valid nonce.'
+      );
     }
 
     // Validate the compact (including nonce validation)
@@ -135,38 +148,48 @@ export async function submitCompact(
       try {
         // Generate claim hash
         const claimHash = await generateClaimHash(storedCompact);
-        
+
         // Generate domain hash for the specific chain
         const domainHash = generateDomainHash(BigInt(submission.chainId));
-        
+
         // Generate the digest that was signed
         const digest = generateDigest(claimHash, domainHash);
-        
+
         // Convert compact signature to full signature for recovery
-        const parsedCompactSig = parseCompactSignature(sponsorSignature as `0x${string}`);
+        const parsedCompactSig = parseCompactSignature(
+          sponsorSignature as `0x${string}`
+        );
         const signature = compactSignatureToSignature(parsedCompactSig);
         const fullSignature = serializeSignature(signature);
-        
+
         // Recover the signer address
         const recoveredAddress = await recoverAddress({
           hash: digest,
           signature: fullSignature,
         });
-        
+
         // Check if the recovered address matches the sponsor
-        isSignatureValid = recoveredAddress.toLowerCase() === normalizedSponsorAddress.toLowerCase();
+        isSignatureValid =
+          recoveredAddress.toLowerCase() ===
+          normalizedSponsorAddress.toLowerCase();
       } catch (error) {
         // Only log errors in non-test environments
         if (process.env.NODE_ENV !== 'test') {
           if (error instanceof Error) {
             // Log a simplified error message
-            console.error('Signature verification failed:', 
-              error.name === 'Error' ? error.message : `${error.name}: ${error.message}`);
+            console.error(
+              'Signature verification failed:',
+              error.name === 'Error'
+                ? error.message
+                : `${error.name}: ${error.message}`
+            );
           } else {
-            console.error('Signature verification failed with unknown error type');
+            console.error(
+              'Signature verification failed with unknown error type'
+            );
           }
         }
-        
+
         // Set signature as invalid and continue to onchain verification
         isSignatureValid = false;
       }
@@ -176,48 +199,60 @@ export async function submitCompact(
     if (!isSignatureValid) {
       // Generate claim hash for onchain registration check
       const claimHash = await generateClaimHash(storedCompact);
-      
+
       // Check if the compact is registered onchain
       const onchainResult = await checkOnchainRegistration(
         claimHash,
         submission.chainId
       );
-      
+
       // Only consider the compact valid if it's in ACTIVE state
       if (onchainResult.status === OnchainRegistrationStatus.ACTIVE) {
         // Verify that the sponsor address matches
         if (
           onchainResult.registeredCompact &&
-          onchainResult.registeredCompact.sponsor.address.toLowerCase() === normalizedSponsorAddress.toLowerCase()
+          onchainResult.registeredCompact.sponsor.address.toLowerCase() ===
+            normalizedSponsorAddress.toLowerCase()
         ) {
           isOnchainRegistration = true;
         } else {
-          throw new Error('Onchain registration sponsor does not match the provided sponsor');
+          throw new Error(
+            'Onchain registration sponsor does not match the provided sponsor'
+          );
         }
       } else {
         // Provide detailed error message based on the status
         switch (onchainResult.status) {
           case OnchainRegistrationStatus.NOT_FOUND:
-            throw new Error('Invalid sponsor signature and compact not found onchain');
+            throw new Error(
+              'Invalid sponsor signature and compact not found onchain'
+            );
           case OnchainRegistrationStatus.PENDING:
-            throw new Error(`Onchain registration is pending finalization (${onchainResult.timeUntilFinalized} seconds remaining)`);
+            throw new Error(
+              `Onchain registration is pending finalization (${onchainResult.timeUntilFinalized} seconds remaining)`
+            );
           case OnchainRegistrationStatus.EXPIRED:
             throw new Error('Onchain registration has expired');
           case OnchainRegistrationStatus.CLAIM_PENDING:
-            throw new Error(`Onchain registration has a pending claim (${onchainResult.timeUntilClaimFinalized} seconds remaining)`);
+            throw new Error(
+              `Onchain registration has a pending claim (${onchainResult.timeUntilClaimFinalized} seconds remaining)`
+            );
           case OnchainRegistrationStatus.CLAIMED:
             throw new Error('Onchain registration has been claimed');
           default:
-            throw new Error(`Invalid sponsor signature and onchain registration status: ${onchainResult.status}`);
+            throw new Error(
+              `Invalid sponsor signature and onchain registration status: ${onchainResult.status}`
+            );
         }
       }
     }
 
     // If neither signature is valid nor onchain registration is active, reject
     if (!isSignatureValid && !isOnchainRegistration) {
-      throw new Error('Invalid sponsor signature and no valid onchain registration found');
+      throw new Error(
+        'Invalid sponsor signature and no valid onchain registration found'
+      );
     }
-
 
     // Sign the compact and get claim hash
     const { hash, signature: signaturePromise } = await signCompact(

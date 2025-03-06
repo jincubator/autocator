@@ -56,16 +56,7 @@ export function useBalances(): UseBalancesResult {
     isFetchingRef.current = true;
 
     try {
-      const sessionId = localStorage.getItem(`session-${address}`);
-      if (!sessionId) {
-        throw new Error('No session ID found');
-      }
-
-      const response = await fetch('/balances', {
-        headers: {
-          'x-session-id': sessionId,
-        },
-      });
+      const response = await fetch('/balances');
 
       if (!response.ok) throw new Error('Failed to fetch balances.');
 

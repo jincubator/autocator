@@ -1,7 +1,16 @@
 import { FastifyInstance } from 'fastify';
-import { createTestServer, getFreshCompact, compactToAPI, generateValidCompactSignature, cleanupTestServer } from './utils/test-server';
+import {
+  createTestServer,
+  getFreshCompact,
+  compactToAPI,
+  generateValidCompactSignature,
+  cleanupTestServer,
+} from './utils/test-server';
 import { submitCompact } from '../compact';
-import { OnchainRegistrationStatus, RegisteredCompactResponse } from '../validation';
+import {
+  OnchainRegistrationStatus,
+  RegisteredCompactResponse,
+} from '../validation';
 import { GraphQLClient } from 'graphql-request';
 import { RequestDocument, Variables, RequestOptions } from 'graphql-request';
 import { dbManager } from './setup';
@@ -14,10 +23,10 @@ describe('Onchain Registration Integration', () => {
   beforeEach(async () => {
     // Create the test server (this will initialize the database)
     server = await createTestServer();
-    
+
     // Store original GraphQL request method
     originalGraphQLRequest = GraphQLClient.prototype.request;
-    
+
     // Ensure the nonces table exists and has the necessary structure
     const db = await dbManager.getDb();
     await db.query(`
@@ -31,7 +40,7 @@ describe('Onchain Registration Integration', () => {
         UNIQUE(chain_id, sponsor, nonce_high, nonce_low)
       )
     `);
-    
+
     // Create index on nonces table
     await db.query(`
       CREATE INDEX IF NOT EXISTS idx_nonces_chain_sponsor ON nonces(chain_id, sponsor)
@@ -50,10 +59,13 @@ describe('Onchain Registration Integration', () => {
     const apiCompact = compactToAPI(freshCompact);
     const chainId = freshCompact.chainId.toString();
     const sponsorAddress = freshCompact.sponsor;
-    
+
     // Generate a valid signature
-    const sponsorSignature = await generateValidCompactSignature(freshCompact, chainId);
-    
+    const sponsorSignature = await generateValidCompactSignature(
+      freshCompact,
+      chainId
+    );
+
     // Submit the compact
     const result = await submitCompact(
       server,
@@ -61,7 +73,7 @@ describe('Onchain Registration Integration', () => {
       sponsorAddress,
       sponsorSignature
     );
-    
+
     // Verify the result
     expect(result).toHaveProperty('hash');
     expect(result).toHaveProperty('signature');
@@ -74,10 +86,11 @@ describe('Onchain Registration Integration', () => {
     const apiCompact = compactToAPI(freshCompact);
     const chainId = freshCompact.chainId.toString();
     const sponsorAddress = freshCompact.sponsor;
-    
+
     // Use an invalid signature
-    const invalidSignature = '0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890';
-    
+    const invalidSignature =
+      '0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890';
+
     // Mock GraphQL response for onchain registration check
     GraphQLClient.prototype.request = async <T = any>(
       _document: RequestDocument | RequestOptions,
@@ -85,13 +98,14 @@ describe('Onchain Registration Integration', () => {
     ): Promise<T> => {
       // Get current time in seconds
       const currentTime = Math.floor(Date.now() / 1000);
-      
+
       // Return a valid active registration (finalized and not expired)
       return {
         registeredCompact: {
           blockNumber: '10030370',
           timestamp: (currentTime - 3600).toString(), // 1 hour ago (finalized)
-          typehash: '0x27f09e0bb8ce2ae63380578af7af85055d3ada248c502e2378b85bc3d05ee0b0',
+          typehash:
+            '0x27f09e0bb8ce2ae63380578af7af85055d3ada248c502e2378b85bc3d05ee0b0',
           expires: (currentTime + 3600).toString(), // Expires in 1 hour (not expired)
           sponsor: {
             address: sponsorAddress.toLowerCase(),
@@ -100,7 +114,7 @@ describe('Onchain Registration Integration', () => {
         },
       } as T;
     };
-    
+
     // Submit the compact with invalid signature
     const result = await submitCompact(
       server,
@@ -108,7 +122,7 @@ describe('Onchain Registration Integration', () => {
       sponsorAddress,
       invalidSignature
     );
-    
+
     // Verify the result
     expect(result).toHaveProperty('hash');
     expect(result).toHaveProperty('signature');
@@ -121,10 +135,11 @@ describe('Onchain Registration Integration', () => {
     const apiCompact = compactToAPI(freshCompact);
     const chainId = freshCompact.chainId.toString();
     const sponsorAddress = freshCompact.sponsor;
-    
+
     // Use an invalid signature
-    const invalidSignature = '0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890';
-    
+    const invalidSignature =
+      '0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890';
+
     // Mock GraphQL response for onchain registration check
     GraphQLClient.prototype.request = async <T = any>(
       _document: RequestDocument | RequestOptions,
@@ -135,7 +150,7 @@ describe('Onchain Registration Integration', () => {
         registeredCompact: null,
       } as T;
     };
-    
+
     // Submit the compact with invalid signature
     await expect(
       submitCompact(
@@ -144,7 +159,9 @@ describe('Onchain Registration Integration', () => {
         sponsorAddress,
         invalidSignature
       )
-    ).rejects.toThrow('Invalid sponsor signature and compact not found onchain');
+    ).rejects.toThrow(
+      'Invalid sponsor signature and compact not found onchain'
+    );
   });
 
   it('should reject a compact with invalid signature and pending onchain registration', async () => {
@@ -153,10 +170,11 @@ describe('Onchain Registration Integration', () => {
     const apiCompact = compactToAPI(freshCompact);
     const chainId = freshCompact.chainId.toString();
     const sponsorAddress = freshCompact.sponsor;
-    
+
     // Use an invalid signature
-    const invalidSignature = '0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890';
-    
+    const invalidSignature =
+      '0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890';
+
     // Mock GraphQL response for onchain registration check
     GraphQLClient.prototype.request = async <T = any>(
       _document: RequestDocument | RequestOptions,
@@ -164,13 +182,14 @@ describe('Onchain Registration Integration', () => {
     ): Promise<T> => {
       // Get current time in seconds
       const currentTime = Math.floor(Date.now() / 1000);
-      
+
       // Return a registration with a timestamp that's very recent (not yet finalized)
       return {
         registeredCompact: {
           blockNumber: '10030370',
           timestamp: (currentTime - 5).toString(), // 5 seconds ago
-          typehash: '0x27f09e0bb8ce2ae63380578af7af85055d3ada248c502e2378b85bc3d05ee0b0',
+          typehash:
+            '0x27f09e0bb8ce2ae63380578af7af85055d3ada248c502e2378b85bc3d05ee0b0',
           expires: '1740779269',
           sponsor: {
             address: sponsorAddress.toLowerCase(),
@@ -179,7 +198,7 @@ describe('Onchain Registration Integration', () => {
         },
       } as T;
     };
-    
+
     // Submit the compact with invalid signature
     await expect(
       submitCompact(
@@ -197,10 +216,11 @@ describe('Onchain Registration Integration', () => {
     const apiCompact = compactToAPI(freshCompact);
     const chainId = freshCompact.chainId.toString();
     const sponsorAddress = freshCompact.sponsor;
-    
+
     // Use an invalid signature
-    const invalidSignature = '0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890';
-    
+    const invalidSignature =
+      '0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890';
+
     // Mock GraphQL response for onchain registration check
     GraphQLClient.prototype.request = async <T = any>(
       _document: RequestDocument | RequestOptions,
@@ -208,13 +228,14 @@ describe('Onchain Registration Integration', () => {
     ): Promise<T> => {
       // Get current time in seconds
       const currentTime = Math.floor(Date.now() / 1000);
-      
+
       // Return a registration with an expired timestamp
       return {
         registeredCompact: {
           blockNumber: '10030370',
           timestamp: (currentTime - 3600).toString(), // 1 hour ago
-          typehash: '0x27f09e0bb8ce2ae63380578af7af85055d3ada248c502e2378b85bc3d05ee0b0',
+          typehash:
+            '0x27f09e0bb8ce2ae63380578af7af85055d3ada248c502e2378b85bc3d05ee0b0',
           expires: (currentTime - 60).toString(), // Expired 1 minute ago
           sponsor: {
             address: sponsorAddress.toLowerCase(),
@@ -223,7 +244,7 @@ describe('Onchain Registration Integration', () => {
         },
       } as T;
     };
-    
+
     // Submit the compact with invalid signature
     await expect(
       submitCompact(
@@ -241,10 +262,11 @@ describe('Onchain Registration Integration', () => {
     const apiCompact = compactToAPI(freshCompact);
     const chainId = freshCompact.chainId.toString();
     const sponsorAddress = freshCompact.sponsor;
-    
+
     // Use an invalid signature
-    const invalidSignature = '0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890';
-    
+    const invalidSignature =
+      '0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890';
+
     // Mock GraphQL response for onchain registration check
     GraphQLClient.prototype.request = async <T = any>(
       _document: RequestDocument | RequestOptions,
@@ -252,13 +274,14 @@ describe('Onchain Registration Integration', () => {
     ): Promise<T> => {
       // Get current time in seconds
       const currentTime = Math.floor(Date.now() / 1000);
-      
+
       // Return a registration with a claim that's already finalized
       return {
         registeredCompact: {
           blockNumber: '10030370',
           timestamp: (currentTime - 3600).toString(), // 1 hour ago
-          typehash: '0x27f09e0bb8ce2ae63380578af7af85055d3ada248c502e2378b85bc3d05ee0b0',
+          typehash:
+            '0x27f09e0bb8ce2ae63380578af7af85055d3ada248c502e2378b85bc3d05ee0b0',
           expires: (currentTime + 3600).toString(), // Expires in 1 hour
           sponsor: {
             address: sponsorAddress.toLowerCase(),
@@ -270,7 +293,7 @@ describe('Onchain Registration Integration', () => {
         },
       } as T;
     };
-    
+
     // Submit the compact with invalid signature
     await expect(
       submitCompact(
@@ -288,10 +311,11 @@ describe('Onchain Registration Integration', () => {
     const apiCompact = compactToAPI(freshCompact);
     const chainId = freshCompact.chainId.toString();
     const sponsorAddress = freshCompact.sponsor;
-    
+
     // Use an invalid signature
-    const invalidSignature = '0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890';
-    
+    const invalidSignature =
+      '0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890';
+
     // Mock GraphQL response for onchain registration check
     GraphQLClient.prototype.request = async <T = any>(
       _document: RequestDocument | RequestOptions,
@@ -299,13 +323,14 @@ describe('Onchain Registration Integration', () => {
     ): Promise<T> => {
       // Get current time in seconds
       const currentTime = Math.floor(Date.now() / 1000);
-      
+
       // Return a registration with a different sponsor
       return {
         registeredCompact: {
           blockNumber: '10030370',
           timestamp: (currentTime - 3600).toString(), // 1 hour ago
-          typehash: '0x27f09e0bb8ce2ae63380578af7af85055d3ada248c502e2378b85bc3d05ee0b0',
+          typehash:
+            '0x27f09e0bb8ce2ae63380578af7af85055d3ada248c502e2378b85bc3d05ee0b0',
           expires: (currentTime + 3600).toString(), // Expires in 1 hour
           sponsor: {
             address: '0x1234567890123456789012345678901234567890', // Different sponsor
@@ -314,7 +339,7 @@ describe('Onchain Registration Integration', () => {
         },
       } as T;
     };
-    
+
     // Submit the compact with invalid signature
     await expect(
       submitCompact(
@@ -323,6 +348,8 @@ describe('Onchain Registration Integration', () => {
         sponsorAddress,
         invalidSignature
       )
-    ).rejects.toThrow('Onchain registration sponsor does not match the provided sponsor');
+    ).rejects.toThrow(
+      'Onchain registration sponsor does not match the provided sponsor'
+    );
   });
 });

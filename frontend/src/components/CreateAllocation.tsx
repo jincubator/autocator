@@ -4,11 +4,7 @@ import {
   EXPIRY_OPTIONS,
 } from '../hooks/useCreateAllocation';
 
-interface CreateAllocationProps {
-  sessionToken: string;
-}
-
-export function CreateAllocation({ sessionToken }: CreateAllocationProps) {
+export function CreateAllocation() {
   const {
     formData,
     errors,
@@ -25,7 +21,7 @@ export function CreateAllocation({ sessionToken }: CreateAllocationProps) {
     handleSubmit,
     generateNewNonce,
     setShowWitnessFields,
-  } = useCreateAllocation(sessionToken);
+  } = useCreateAllocation();
 
   if (!isConnected) return null;
 

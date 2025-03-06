@@ -74,10 +74,10 @@ export async function checkOnchainRegistration(
   try {
     // Get the finalization threshold for this chain
     const finalizationThreshold = getFinalizationThreshold(chainId);
-    
+
     // Current time in seconds
     const currentTimeSeconds = Math.floor(Date.now() / 1000);
-    
+
     // Query the indexer for the registered compact
     const response = await graphqlClient.request<RegisteredCompactResponse>(
       GET_REGISTERED_COMPACT,
@@ -86,61 +86,65 @@ export async function checkOnchainRegistration(
         chainId,
       }
     );
-    
+
     // If no registered compact is found, return NOT_FOUND
     if (!response.registeredCompact) {
       return { status: OnchainRegistrationStatus.NOT_FOUND };
     }
-    
+
     const registeredCompact = response.registeredCompact;
-    
+
     // Calculate the finalization timestamp for the registration
     const registrationTimestamp = parseInt(registeredCompact.timestamp);
-    const registrationFinalizationTimestamp = registrationTimestamp + finalizationThreshold;
-    
+    const registrationFinalizationTimestamp =
+      registrationTimestamp + finalizationThreshold;
+
     // Check if the registration is still pending finalization
     if (currentTimeSeconds < registrationFinalizationTimestamp) {
       return {
         status: OnchainRegistrationStatus.PENDING,
-        timeUntilFinalized: registrationFinalizationTimestamp - currentTimeSeconds,
+        timeUntilFinalized:
+          registrationFinalizationTimestamp - currentTimeSeconds,
         registeredCompact,
       };
     }
-    
+
     // Check if there's a claim
     if (registeredCompact.claim) {
       // Calculate the finalization timestamp for the claim
       const claimTimestamp = parseInt(registeredCompact.claim.timestamp);
       const claimFinalizationTimestamp = claimTimestamp + finalizationThreshold;
-      
+
       // Check if the claim is still pending finalization
       if (currentTimeSeconds < claimFinalizationTimestamp) {
         return {
           status: OnchainRegistrationStatus.CLAIM_PENDING,
-          timeUntilClaimFinalized: claimFinalizationTimestamp - currentTimeSeconds,
+          timeUntilClaimFinalized:
+            claimFinalizationTimestamp - currentTimeSeconds,
           registeredCompact,
         };
       }
-      
+
       // If the claim is finalized, return CLAIMED
       return {
         status: OnchainRegistrationStatus.CLAIMED,
         registeredCompact,
       };
     }
-    
+
     // Check if the compact is expired
     // A compact is considered expired if the current time is past the expiration time plus the finalization threshold
     const expirationTimestamp = parseInt(registeredCompact.expires);
-    const finalExpirationTimestamp = expirationTimestamp + finalizationThreshold;
-    
+    const finalExpirationTimestamp =
+      expirationTimestamp + finalizationThreshold;
+
     if (currentTimeSeconds > finalExpirationTimestamp) {
       return {
         status: OnchainRegistrationStatus.EXPIRED,
         registeredCompact,
       };
     }
-    
+
     // If the registration is finalized, not expired, and has no claim, it's active
     return {
       status: OnchainRegistrationStatus.ACTIVE,

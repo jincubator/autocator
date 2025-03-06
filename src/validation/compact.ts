@@ -35,12 +35,13 @@ export async function validateCompact(
 
     // 3. Nonce Validation (nonce is required)
     if (validatedCompact.nonce === null) {
-      return { 
-        isValid: false, 
-        error: 'Nonce is required. Use /suggested-nonce/:chainId to get a valid nonce.' 
+      return {
+        isValid: false,
+        error:
+          'Nonce is required. Use /suggested-nonce/:chainId to get a valid nonce.',
       };
     }
-    
+
     const nonceResult = await validateNonce(
       validatedCompact.nonce,
       validatedCompact.sponsor,

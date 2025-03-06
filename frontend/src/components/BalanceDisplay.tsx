@@ -8,7 +8,6 @@ import { WithdrawalCountdown } from './WithdrawalCountdown';
 import { formatResetPeriod } from '../utils/formatting';
 import {
   useBalanceDisplay,
-  type BalanceDisplayProps,
   formatLockId,
   getChainName,
 } from '../hooks/useBalanceDisplay';
@@ -28,7 +27,6 @@ interface BalanceItemProps {
     decimals: number,
     symbol: string
   ) => void;
-  sessionToken: string | null;
 }
 
 // Memoized balance value component
@@ -85,7 +83,6 @@ const BalanceItem = memo(
     onInitiateWithdrawal,
     onDisableWithdrawal,
     onExecuteWithdrawal,
-    sessionToken,
   }: BalanceItemProps) {
     const withdrawableAt = parseInt(balance.withdrawableAt || '0');
     const canExecuteWithdrawal = useMemo(() => {
@@ -246,7 +243,6 @@ const BalanceItem = memo(
                 }}
                 tokenSymbol={balance.token?.symbol || ''}
                 withdrawalStatus={balance.withdrawalStatus}
-                sessionToken={sessionToken}
                 resetPeriod={resourceLock.resourceLock.resetPeriod}
                 onForceWithdraw={handleForceWithdraw}
                 onDisableForceWithdraw={handleDisableForceWithdraw}
@@ -287,17 +283,11 @@ const BalanceItem = memo(
       nextProps.resourceLock
     );
 
-    return (
-      balanceEqual &&
-      resourceLockEqual &&
-      prevProps.sessionToken === nextProps.sessionToken
-    );
+    return balanceEqual && resourceLockEqual;
   }
 );
 
-export function BalanceDisplay({
-  sessionToken,
-}: BalanceDisplayProps): JSX.Element | null {
+export function BalanceDisplay(): JSX.Element | null {
   const {
     isConnected,
     isLoading,
@@ -311,13 +301,9 @@ export function BalanceDisplay({
     setIsExecuteDialogOpen,
     selectedLockId,
     selectedLock,
-    isSessionIdDialogOpen,
-    setIsSessionIdDialogOpen,
     handleDisableWithdrawal,
     handleInitiateWithdrawal,
     handleExecuteWithdrawal,
-    handleCopySessionId,
-    address,
   } = useBalanceDisplay();
 
   if (!isConnected) return null;
@@ -326,12 +312,6 @@ export function BalanceDisplay({
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold text-white">Resource Locks</h2>
-        <button
-          onClick={() => setIsSessionIdDialogOpen(true)}
-          className="px-3 py-1 text-sm bg-[#00ff00]/10 text-[#00ff00] rounded hover:bg-[#00ff00]/20 transition-colors"
-        >
-          Show Session ID
-        </button>
       </div>
 
       {isLoading || resourceLocksLoading ? (
@@ -366,57 +346,9 @@ export function BalanceDisplay({
                 onInitiateWithdrawal={handleInitiateWithdrawal}
                 onDisableWithdrawal={handleDisableWithdrawal}
                 onExecuteWithdrawal={handleExecuteWithdrawal}
-                sessionToken={sessionToken}
               />
             );
           })}
-        </div>
-      )}
-
-      {/* Session ID Dialog */}
-      {isSessionIdDialogOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-gray-900 rounded-lg p-6 max-w-md w-full mx-4 space-y-4 border border-gray-800">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold text-white">Session ID</h3>
-              <button
-                onClick={() => setIsSessionIdDialogOpen(false)}
-                className="text-gray-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-            <p className="text-sm text-gray-300 mb-4">
-              Supply this value as a{' '}
-              <code className="bg-black/30 px-1.5 py-0.5 rounded text-sm">
-                x-session-id
-              </code>{' '}
-              header to make authenticated requests to the API.
-            </p>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 bg-black/50 p-3 rounded font-mono text-sm break-all">
-                {localStorage.getItem(`session-${address}`) ||
-                  'No session found'}
-              </div>
-              <button
-                onClick={handleCopySessionId}
-                className="px-3 py-2 text-sm bg-[#00ff00]/10 text-[#00ff00] rounded hover:bg-[#00ff00]/20 transition-colors whitespace-nowrap"
-              >
-                Copy
-              </button>
-            </div>
-            <div className="mt-4 p-3 bg-yellow-900/20 border border-yellow-700/30 rounded text-sm text-yellow-200/80">
-              <strong className="block mb-1 text-yellow-200">
-                ⚠️ Warning:
-              </strong>
-              Do not share your session key with third parties you do not trust!
-              Anyone in possession of your session key will be able to request
-              allocations on your behalf and view your allocation statuses and
-              partial information on submitted compacts. However, they will not
-              be able to transfer or withdraw your tokens without a
-              corresponding signature from you.
-            </div>
-          </div>
         </div>
       )}
 

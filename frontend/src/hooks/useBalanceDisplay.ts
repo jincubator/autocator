@@ -6,10 +6,6 @@ import { useCompact } from './useCompact';
 import { useNotification } from './useNotification';
 import { getChainName } from '../utils/chains';
 
-export interface BalanceDisplayProps {
-  sessionToken: string | null;
-}
-
 export interface SelectedLockData {
   chainId: string;
   lockId: string;
@@ -42,7 +38,7 @@ export function formatLockId(lockId: string): string {
 }
 
 export function useBalanceDisplay() {
-  const { address, isConnected } = useAccount();
+  const { isConnected } = useAccount();
   const currentChainId = useChainId();
   const { balances, error, isLoading } = useBalances();
   const { data: resourceLocksData, isLoading: resourceLocksLoading } =
@@ -55,7 +51,6 @@ export function useBalanceDisplay() {
   const [selectedLock, setSelectedLock] = useState<SelectedLockData | null>(
     null
   );
-  const [isSessionIdDialogOpen, setIsSessionIdDialogOpen] = useState(false);
 
   // Memoize the network switching logic
   const switchNetwork = useCallback(
@@ -210,26 +205,6 @@ export function useBalanceDisplay() {
     [currentChainId, switchNetwork]
   );
 
-  const handleCopySessionId = useCallback(async () => {
-    const sessionId = localStorage.getItem(`session-${address}`);
-    if (!sessionId) return;
-
-    try {
-      await navigator.clipboard.writeText(sessionId);
-      showNotification({
-        type: 'success',
-        title: 'Copied',
-        message: 'Session ID copied to clipboard',
-      });
-    } catch {
-      showNotification({
-        type: 'error',
-        title: 'Error',
-        message: 'Failed to copy session ID',
-      });
-    }
-  }, [address, showNotification]);
-
   // Memoize the return value to prevent unnecessary rerenders
   const returnValue = useMemo(
     () => ({
@@ -245,13 +220,9 @@ export function useBalanceDisplay() {
       setIsExecuteDialogOpen,
       selectedLockId,
       selectedLock,
-      isSessionIdDialogOpen,
-      setIsSessionIdDialogOpen,
       handleDisableWithdrawal,
       handleInitiateWithdrawal,
       handleExecuteWithdrawal,
-      handleCopySessionId,
-      address,
     }),
     [
       isConnected,
@@ -264,12 +235,9 @@ export function useBalanceDisplay() {
       isExecuteDialogOpen,
       selectedLockId,
       selectedLock,
-      isSessionIdDialogOpen,
       handleDisableWithdrawal,
       handleInitiateWithdrawal,
       handleExecuteWithdrawal,
-      handleCopySessionId,
-      address,
     ]
   );
 

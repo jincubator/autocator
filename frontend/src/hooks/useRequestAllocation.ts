@@ -27,10 +27,7 @@ export function useRequestAllocation() {
   const { createAllocation } = useAllocatorAPI();
 
   const requestAllocation = useCallback(
-    async (
-      params: RequestAllocationParams,
-      sessionToken: string
-    ): Promise<AllocationResponse> => {
+    async (params: RequestAllocationParams): Promise<AllocationResponse> => {
       try {
         // Create API params, preserving any witness fields if present
         const apiParams = {
@@ -53,7 +50,7 @@ export function useRequestAllocation() {
           },
         };
 
-        const response = await createAllocation(sessionToken, apiParams);
+        const response = await createAllocation(apiParams);
 
         // The API response should include the nonce in the response
         // If not, we'll throw an error since we need it

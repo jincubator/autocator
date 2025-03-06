@@ -41,7 +41,7 @@ export const EXPIRY_OPTIONS = [
   { label: 'Custom', value: 'custom', seconds: 0 },
 ];
 
-export function useCreateAllocation(sessionToken: string) {
+export function useCreateAllocation() {
   const { address, isConnected } = useAccount();
   const { balances, isLoading: isLoadingBalances } = useBalances();
   const { showNotification } = useNotification();
@@ -224,7 +224,7 @@ export function useCreateAllocation(sessionToken: string) {
         },
       };
 
-      const result = await createAllocation(sessionToken, request);
+      const result = await createAllocation(request);
 
       showNotification({
         type: 'success',

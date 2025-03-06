@@ -64,14 +64,12 @@ export function useAllocatorAPI() {
   }, []);
 
   const createAllocation = async (
-    sessionToken: string,
     request: CompactRequest
   ): Promise<CompactResponse> => {
     const response = await fetch('/compact', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-session-id': sessionToken,
       },
       body: JSON.stringify(request),
     });

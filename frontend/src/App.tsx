@@ -6,7 +6,6 @@ import { useState } from 'react';
 
 import { config } from './config/wagmi';
 import { WalletConnect } from './components/WalletConnect';
-import { SessionManager } from './components/SessionManager';
 import { BalanceDisplay } from './components/BalanceDisplay';
 import HealthCheck from './components/HealthCheck';
 import { DepositForm } from './components/DepositForm';
@@ -32,7 +31,6 @@ const customTheme = darkTheme({
 });
 
 function AppContent() {
-  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [isHealthy, setIsHealthy] = useState(true);
 
   return (
@@ -41,13 +39,12 @@ function AppContent() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-black font-monaco">
-              <span className="text-white">Sm</span>
-              <span className="text-[#00ff00]">all</span>
-              <span className="text-[#00ff00]">ocator</span>
-              <span className="text-white"> 🤏</span>
+              <span className="text-white">Auto</span>
+              <span className="text-[#00ff00]">cator</span>
+              <span className="text-white"> 🚗</span>
             </h1>
             <p className="text-gray-400 text-sm mt-1">
-              A minimalistic server-based allocator for{' '}
+              A server-based allocator for{' '}
               <a
                 href="https://github.com/Uniswap/the-compact"
                 target="_blank"
@@ -79,12 +76,7 @@ function AppContent() {
                 <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
               </svg>
             </a>
-            <WalletConnect hasSession={!!sessionToken} />
-            <SessionManager
-              sessionToken={sessionToken}
-              onSessionUpdate={setSessionToken}
-              isServerHealthy={isHealthy}
-            />
+            <WalletConnect />
           </div>
         </div>
       </header>
@@ -101,14 +93,12 @@ function AppContent() {
             {isHealthy && (
               <>
                 {/* Deposit Form */}
-                {sessionToken && <DepositForm />}
+                <DepositForm />
 
                 {/* Balance Display */}
-                {sessionToken && (
-                  <div className="mx-auto p-6 bg-[#0a0a0a] rounded-lg shadow-xl border border-gray-800">
-                    <BalanceDisplay sessionToken={sessionToken} />
-                  </div>
-                )}
+                <div className="mx-auto p-6 bg-[#0a0a0a] rounded-lg shadow-xl border border-gray-800">
+                  <BalanceDisplay />
+                </div>
               </>
             )}
 
