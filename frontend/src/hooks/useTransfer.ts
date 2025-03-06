@@ -1,10 +1,14 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { useAccount, useChainId, useReadContract } from 'wagmi';
+import {
+  useAccount,
+  useChainId,
+  useReadContract,
+  useSignTypedData,
+} from 'wagmi';
 import { parseUnits, isAddress } from 'viem';
 import { useNotification } from '../hooks/useNotification';
 import { useAllocatedTransfer } from '../hooks/useAllocatedTransfer';
 import { useAllocatedWithdrawal } from '../hooks/useAllocatedWithdrawal';
-import { useRequestAllocation } from '../hooks/useRequestAllocation';
 import { COMPACT_ADDRESS, COMPACT_ABI } from '../constants/contracts';
 import { getChainName } from '../utils/chains';
 
@@ -66,8 +70,8 @@ export function useTransfer(
     useAllocatedTransfer();
   const { allocatedWithdrawal, isConfirming: isWithdrawalConfirming } =
     useAllocatedWithdrawal();
-  const { requestAllocation } = useRequestAllocation();
   const { showNotification } = useNotification();
+  const { signTypedDataAsync } = useSignTypedData();
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   const [customExpiry, setCustomExpiry] = useState(false);
@@ -384,22 +388,107 @@ export function useTransfer(
     try {
       setIsRequestingAllocation(true);
 
-      const params = {
-        chainId: targetChainId,
-        compact: {
-          // Set arbiter equal to sponsor (user's address)
-          arbiter: address,
-          sponsor: address,
-          nonce: null,
-          expires: formData.expires,
-          id: lockId.toString(),
-          amount: parseUnits(formData.amount, decimals).toString(),
-          witnessTypeString: null,
-          witnessHash: null,
-        },
+      // Step 1: Request nonce from the server
+      const nonceResponse = await fetch(
+        `/suggested-nonce/${targetChainId}/${address}`
+      );
+      if (!nonceResponse.ok) {
+        throw new Error('Failed to get nonce from server');
+      }
+      const { nonce } = await nonceResponse.json();
+
+      console.log(`got nonce: ${nonce}`);
+
+      // Step 2: Build the compact payload
+      const compact = {
+        arbiter: address as `0x${string}`,
+        sponsor: address as `0x${string}`,
+        nonce,
+        expires: formData.expires,
+        id: lockId.toString(),
+        amount: parseUnits(formData.amount, decimals).toString(),
       };
 
-      const response = await requestAllocation(params);
+      // Step 3: Get user signature
+      // Create the EIP-712 payload
+      const domain = {
+        name: 'The Compact',
+        version: '0',
+        chainId: BigInt(targetChainId),
+        verifyingContract: COMPACT_ADDRESS[
+          parseInt(targetChainId)
+        ] as `0x${string}`,
+      };
+
+      // Define the types for EIP-712 signing
+      const types = {
+        Compact: [
+          { name: 'arbiter', type: 'address' },
+          { name: 'sponsor', type: 'address' },
+          { name: 'nonce', type: 'uint256' },
+          { name: 'expires', type: 'uint256' },
+          { name: 'id', type: 'uint256' },
+          { name: 'amount', type: 'uint256' },
+        ],
+      };
+
+      // Prepare the message for signing
+      const message = {
+        arbiter: compact.arbiter,
+        sponsor: compact.sponsor,
+        nonce: BigInt(compact.nonce),
+        expires: BigInt(compact.expires),
+        id: BigInt(compact.id),
+        amount: BigInt(compact.amount),
+      };
+
+      console.log('prepared message for sponsor signature:', {
+        arbiter: message.arbiter,
+        sponsor: message.sponsor,
+        nonce: message.nonce.toString(),
+        expires: message.expires.toString(),
+        id: message.id.toString(),
+        amount: message.amount.toString(),
+      });
+
+      // Sign the message using wagmi's signTypedDataAsync
+      const userSignature = await signTypedDataAsync({
+        domain,
+        message,
+        primaryType: 'Compact',
+        types,
+      });
+
+      // Step 4: Submit the payload to the server to get the server signature
+      const serverResponse = await fetch('/compact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chainId: targetChainId,
+          compact: {
+            arbiter: compact.arbiter,
+            sponsor: compact.sponsor,
+            nonce: compact.nonce,
+            expires: compact.expires,
+            id: compact.id,
+            amount: compact.amount,
+          },
+          sponsorSignature: userSignature,
+        }),
+      });
+
+      if (!serverResponse.ok) {
+        const errorData = await serverResponse
+          .json()
+          .catch(() => ({ error: 'Unknown error' }));
+        throw new Error(
+          errorData.error || `Server error: ${serverResponse.statusText}`
+        );
+      }
+
+      const response = await serverResponse.json();
 
       setFormData((prev: FormData) => ({
         ...prev,
@@ -411,19 +500,20 @@ export function useTransfer(
       setHasAllocation(true);
       showNotification({
         type: 'success',
-        title: 'Allocation Requested',
-        message:
-          'Successfully received allocation. You can now submit the transfer.',
+        title: isWithdrawal ? 'Withdrawal Authorized' : 'Transfer Authorized',
+        message: `Successfully authorized ${isWithdrawal ? 'withdrawal' : 'transfer'}. You can now submit the transaction.`,
       });
     } catch (error) {
-      console.error('Error requesting allocation:', error);
+      console.error('Error authorizing operation:', error);
       showNotification({
         type: 'error',
-        title: 'Allocation Request Failed',
+        title: isWithdrawal
+          ? 'Withdrawal Authorization Failed'
+          : 'Transfer Authorization Failed',
         message:
           error instanceof Error
             ? error.message
-            : 'Failed to request allocation',
+            : `Failed to authorize ${isWithdrawal ? 'withdrawal' : 'transfer'}`,
       });
     } finally {
       setIsRequestingAllocation(false);
