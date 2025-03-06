@@ -39,8 +39,8 @@ function AppContent() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-black font-monaco">
-              <span className="text-white">Auto</span>
-              <span className="text-[#00ff00]">cator</span>
+              <span className="text-[#00ff00]">Auto</span>
+              <span className="text-white">cator</span>
               <span className="text-white"> 🚗</span>
             </h1>
             <p className="text-gray-400 text-sm mt-1">
