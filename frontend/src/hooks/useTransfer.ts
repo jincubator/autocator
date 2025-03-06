@@ -564,7 +564,7 @@ export function useTransfer(
         // Convert values and prepare transfer struct
         const transfer = {
           allocatorSignature: formData.allocatorSignature as `0x${string}`,
-          nonce: BigInt(formData.nonce),
+          nonce: BigInt(formData.nonce!),
           expires: BigInt(formData.expires),
           id: lockId,
           amount: parseUnits(formData.amount, decimals),
@@ -576,6 +576,20 @@ export function useTransfer(
           decimals,
           symbol: tokenSymbol,
         };
+
+        // Log inputs for debugging
+        console.log('Transaction inputs before submission:', {
+          currentChainId,
+          targetChainId,
+          transfer: {
+            ...transfer,
+            nonce: transfer.nonce.toString(),
+            expires: transfer.expires.toString(),
+            id: transfer.id.toString(),
+            amount: transfer.amount.toString(),
+          },
+          tokenInfo,
+        });
 
         // Submit transfer or withdrawal
         if (isWithdrawal) {
