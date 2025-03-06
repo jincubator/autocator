@@ -5,7 +5,7 @@ interface NotificationContextType {
     type: 'success' | 'error' | 'warning' | 'info';
     title: string;
     message: string;
-    stage?: 'initiated' | 'submitted' | 'confirmed';
+    stage?: 'pre-initiation' | 'initiated' | 'submitted' | 'confirmed';
     txHash?: string;
     chainId?: number | string;
     autoHide?: boolean;
