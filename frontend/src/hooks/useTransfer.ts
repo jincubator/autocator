@@ -5,7 +5,13 @@ import {
   useReadContract,
   useSignTypedData,
 } from 'wagmi';
-import { parseUnits, isAddress } from 'viem';
+import {
+  parseUnits,
+  isAddress,
+  signatureToCompactSignature,
+  serializeCompactSignature,
+  parseSignature,
+} from 'viem';
 import { useNotification } from '../hooks/useNotification';
 import { useAllocatedTransfer } from '../hooks/useAllocatedTransfer';
 import { useAllocatedWithdrawal } from '../hooks/useAllocatedWithdrawal';
@@ -79,7 +85,7 @@ export function useTransfer(
 
   // Check if nonce has been consumed
   const { data: isNonceConsumed } = useReadContract({
-    address: COMPACT_ADDRESS[parseInt(targetChainId)] as `0x${string}`,
+    address: COMPACT_ADDRESS as `0x${string}`,
     abi: COMPACT_ABI,
     functionName: 'hasConsumedAllocatorNonce',
     args:
@@ -407,6 +413,8 @@ export function useTransfer(
         expires: formData.expires,
         id: lockId.toString(),
         amount: parseUnits(formData.amount, decimals).toString(),
+        witnessTypeString: null,
+        witnessHash: null,
       };
 
       // Step 3: Get user signature
@@ -415,10 +423,14 @@ export function useTransfer(
         name: 'The Compact',
         version: '0',
         chainId: BigInt(targetChainId),
-        verifyingContract: COMPACT_ADDRESS[
-          parseInt(targetChainId)
-        ] as `0x${string}`,
+        verifyingContract: COMPACT_ADDRESS as `0x${string}`,
       };
+
+      console.log('Domain for signing:', {
+        ...domain,
+        chainId: domain.chainId.toString(),
+        verifyingContract: domain.verifyingContract,
+      });
 
       // Define the types for EIP-712 signing
       const types = {
@@ -452,31 +464,48 @@ export function useTransfer(
       });
 
       // Sign the message using wagmi's signTypedDataAsync
-      const userSignature = await signTypedDataAsync({
+      let userSignature = await signTypedDataAsync({
         domain,
         message,
         primaryType: 'Compact',
         types,
       });
 
+      console.log('Original user signature:', userSignature);
+      // Convert to compact signature if needed
+      let compactUserSignature = userSignature;
+      if (userSignature.length === 132) {
+        console.log('Converting signature to compact format...');
+        const parsedSig = parseSignature(userSignature);
+        const compactSig = signatureToCompactSignature(parsedSig);
+        compactUserSignature = serializeCompactSignature(compactSig);
+        console.log('Serialized compact signature:', compactUserSignature);
+      }
+
       // Step 4: Submit the payload to the server to get the server signature
+      const payload = {
+        chainId: targetChainId,
+        compact: {
+          arbiter: compact.arbiter,
+          sponsor: compact.sponsor,
+          nonce: compact.nonce,
+          expires: compact.expires,
+          id: compact.id,
+          amount: compact.amount,
+          witnessTypeString: compact.witnessTypeString,
+          witnessHash: compact.witnessHash,
+        },
+        sponsorSignature: compactUserSignature,
+      };
+
+      console.log('Sending payload to server:', payload);
+
       const serverResponse = await fetch('/compact', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          chainId: targetChainId,
-          compact: {
-            arbiter: compact.arbiter,
-            sponsor: compact.sponsor,
-            nonce: compact.nonce,
-            expires: compact.expires,
-            id: compact.id,
-            amount: compact.amount,
-          },
-          sponsorSignature: userSignature,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!serverResponse.ok) {
@@ -489,6 +518,7 @@ export function useTransfer(
       }
 
       const response = await serverResponse.json();
+      console.log('Server response:', response);
 
       setFormData((prev: FormData) => ({
         ...prev,

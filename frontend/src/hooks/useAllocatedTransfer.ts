@@ -61,6 +61,8 @@ interface CompactPayload {
   expires: string;
   id: string;
   amount: string;
+  witnessTypeString?: string | null;
+  witnessHash?: string | null;
 }
 
 // Interface for the server response
@@ -251,6 +253,8 @@ export function useAllocatedTransfer() {
             expires: compact.expires,
             id: compact.id,
             amount: compact.amount,
+            witnessTypeString: null,
+            witnessHash: null,
           },
           sponsorSignature: compactUserSignature,
         }),
