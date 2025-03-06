@@ -1,13 +1,22 @@
-# $$\mathbf{Sm\color{green}{allocator}}$$ 🤏
+# $$\mathbf{Auto\color{green}{cator}}$$ 🚗
 
-A minimalistic server-based allocator for [The Compact](https://github.com/Uniswap/the-compact). Smallocator provides an API for sponsors to request resource lock allocations across multiple blockchains, with support for EIP-4361 session authentication and signing EIP-712 `Compact` messages. It also includes a frontend application for interacting directly with the server that also facilitates making deposits into resource locks it oversees.
+A server-based allocator for [The Compact](https://github.com/Uniswap/the-compact) that leverages protocol signatures and transactions for authentication. Autocator provides an API for requesting resource lock allocations across multiple blockchains by providing the details of associated compacts with accompanying sponsor signatures or onchain registrations. It also includes a frontend application for interacting directly with the server that also facilitates making deposits into resource locks it oversees.
 
-> ⚠️ Smallocator is under developement and is intended to serve as a reference for understanding server-based allocator functionality and for testing purposes. Use caution when using Smallocator in a production environment.
+Autocator is a fork of [Smallocator](https://github.com/uniswap/smallocator) with key differences:
+
+- No "Sign in with Ethereum" authentication component
+  - Note that **Autocator does not provide the same privacy guarantees as Smallocator** — allocated token balances and suggested nonces are public. The primary intended mechainism for Autocator is the "deposit and register" flow, where information on the input tokens is already public, with support for retries and early withdrawals when necessary.
+- Simplified flow: request nonce => sponsor signs or registers and informs Autocator => Autocator cosigns
+- Requires either:
+  - a valid sponsor signature with the payload when submitting a compact, or
+  - an onchain registration of the compact, in which case there's no attached signature
+
+> ⚠️ Autocator is under development and is intended to serve as a reference for understanding server-based allocator functionality and for testing purposes. Use caution when using Autocator in a production environment.
 
 ## Features
 
-- 🔐 Secure session-based authentication for sponsors using EIP-4361
-- ✍️ EIP-712 Compact message validation and signing on demand from session-gated sponsors
+- ✍️ EIP-712 Compact message validation and signing with sponsor signature verification
+- 🔄 Support for onchain registration verification as an alternative to sponsor signatures
 - 🤫 No witness data or signature provided, keeping sponsor intents secret (only the typestring and witness hash is supplied)
 - 📊 GraphQL integration with [The Compact Indexer](https://github.com/Uniswap/the-compact-indexer) for multi-chain indexing
 - 💾 Persistent storage using PGLite to track attested compacts and used nonces
@@ -19,22 +28,20 @@ A minimalistic server-based allocator for [The Compact](https://github.com/Unisw
 - ❄️ Strict nonce usage: Ensures every attested nonce is unique; no reuse on expirations and no direct onchain nonce consumption
 - 🧭 No `attest()` callbacks for ERC6909 transfers: focused solely on attesting compacts
 - 🪞 No compact qualification: Attests to the exact compact provided to it without adding qualifiers or extra metadata
-- 📡 No direct on-chain awareness: Relies entirely on indexer and internal attestation state
+- 📡 Limited on-chain awareness: Uses indexer to verify onchain registrations
 - ⏳ Straightforward finalization: Uses a simple, time-based approach per chain for determining transaction finality
-
-A lightweight hosted version is currently deployed to [https://smallocator.xyz](https://smallocator.xyz/). Note that it's not ready for any kind of production use (do reach out if it goes down).
 
 ## UI Usage
 
-A basic frontend is available at the root path (`GET /`), or at `localhost:3001/` when running locally in dev mode. While the primary intended mechanism of interaction with Smallocator is via the API, the UI serves as a convenient and direct secondary access point.
+A basic frontend is available at the root path (`GET /`), or at `localhost:3001/` when running locally in dev mode. While the primary intended mechanism of interaction with Autocator is via the API, the UI serves as a convenient and direct secondary access point.
 
 It supports:
- - viewing the health status of the server
- - managing session key via EIP-4361 (Sign in with Ethereum)
- - depositing Native tokens and ERC20 tokens
- - viewing allocatable and allocated balances
- - performing allocated transfers and withdrawals
- - initiating, executing, and disabling forced withdrawals
+
+- viewing the health status of the server
+- depositing Native tokens and ERC20 tokens
+- viewing allocatable and allocated balances
+- performing allocated transfers and withdrawals
+- initiating, executing, and disabling forced withdrawals
 
 Note that the frontend is still relatively unstable (any contributions here are welcome).
 
@@ -66,6 +73,11 @@ Example response:
       "finalizationThresholdSeconds": 10
     },
     {
+      "chainId": "130",
+      "allocatorId": "0x2345678901234567890abcde",
+      "finalizationThresholdSeconds": 2
+    },
+    {
       "chainId": "8453",
       "allocatorId": "0x2345678901234567890abcde",
       "finalizationThresholdSeconds": 2
@@ -74,107 +86,29 @@ Example response:
 }
 ```
 
-### Authentication
-
-All authentication endpoints require a valid session ID in the `x-session-id` header.
-
-1. **Get Session Payload**
-
-   ```http
-   GET /session/:chainId/:address
-   ```
-
-   Returns an EIP-4361 payload for signing. The chainId parameter specifies which blockchain network to authenticate for. Example response:
-
-   ```json
-   {
-     "payload": {
-       "domain": "localhost:3000",
-       "address": "0x...",
-       "uri": "http://localhost:3000",
-       "statement": "Sign in to Smallocator",
-       "version": "1",
-       "chainId": 10,
-       "nonce": "unique_nonce",
-       "issuedAt": "2024-12-03T12:00:00Z",
-       "expirationTime": "2024-12-03T13:00:00Z"
-     }
-   }
-   ```
-
-2. **Create Session**
-
-   ```http
-   POST /session
-   ```
-
-   Submit the signed payload to create a session. Example request:
-
-   ```json
-   {
-     "signature": "0x1234...7890",
-     "payload": {
-       "domain": "localhost:3000",
-       "address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-       "uri": "http://localhost:3000",
-       "statement": "Sign in to Smallocator",
-       "version": "1",
-       "chainId": 1,
-       "nonce": "d6e1c0c4-3d78-4daa-9e57-5485b7c8c6c3",
-       "issuedAt": "2024-03-07T12:00:00.000Z",
-       "expirationTime": "2024-03-07T13:00:00.000Z",
-       "resources": ["http://localhost:3000/resources"]
-     }
-   }
-   ```
-
-   Returns a session ID for subsequent requests.
-
-3. **Get Session**
-
-   ```http
-   GET /session
-   ```
-
-   Requires a valid session ID in the `x-session-id` header.
-
-   Example response:
-
-   ```json
-   {
-     "session": {
-       "id": "550e8400-e29b-41d4-a716-446655440000",
-       "address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-       "expiresAt": "2024-03-07T13:30:00Z"
-     }
-   }
-   ```
-
-4. **Delete Session**
-
-   ```http
-   DELETE /session
-   ```
-
-   Requires a valid session ID in the `x-session-id` header.
-
-   Example response:
-
-   ```json
-   {
-     "success": true
-   }
-   ```
-
 ### Compact Operations
 
-1. **Submit Compact**
+1. **Get Suggested Nonce**
+
+   ```http
+   GET /suggested-nonce/:chainId/:account
+   ```
+
+   Returns the next available unused nonce for the specified account for creating new compacts on a specific chain.
+
+   Example response:
+
+   ```json
+   {
+     "nonce": "0x70997970C51812dc3A010C7d01b50e0d17dc79C800000000000000000000001"
+   }
+   ```
+
+2. **Submit Compact**
 
    ```http
    POST /compact
    ```
-
-   Requires a valid session ID in the `x-session-id` header.
 
    Example request:
 
@@ -189,8 +123,9 @@ All authentication endpoints require a valid session ID in the `x-session-id` he
        "id": "0x300000000000000000000000000000000000000000000000000000000000001c",
        "amount": "1000000000000000000",
        "witnessTypeString": "ExampleWitness exampleWitness)ExampleWitness(uint256 foo, bytes32 bar)",
-       "witnessHash": "0x0000000000000000000000000000000000000000000000000000000000000123"
-     }
+       "witnessHash": "0x0000000000000000000000000000000000000000000000000000000123"
+     },
+     "sponsorSignature": "0x1234...7890"
    }
    ```
 
@@ -204,15 +139,15 @@ All authentication endpoints require a valid session ID in the `x-session-id` he
    }
    ```
 
-Note that `nonce` can be provided as `null` in which case the next available valid nonce will be automatically assigned. `witnessTypeString` and `witnessHash` can also be `null` in which case the attested compact will not incorporate witness data (values must be provided for both or omitted for both to be considered valid).
+Note that `nonce` is required and must be a valid nonce for the sponsor. Use the `/suggested-nonce/:chainId/:account` endpoint to get a valid nonce. `witnessTypeString` and `witnessHash` can be `null` in which case the attested compact will not incorporate witness data (values must be provided for both or omitted for both to be considered valid).
 
-2. **Get Compacts by Address**
+The `sponsorSignature` is required unless the compact is registered onchain. If the signature is invalid or missing, Autocator will check if the compact is registered onchain, that the registration has not expired, and that the associated compact has not already been claimed. If it is, the compact will be cosigned by Autocator.
+
+3. **Get Compacts by Address**
 
    ```http
-   GET /compacts
+   GET /compacts?sponsor=0x70997970C51812dc3A010C7d01b50e0d17dc79C8
    ```
-
-   Requires a valid session ID in the `x-session-id` header.
 
    Example response:
 
@@ -237,13 +172,11 @@ Note that `nonce` can be provided as `null` in which case the next available val
    ]
    ```
 
-3. **Get Specific Compact**
+4. **Get Specific Compact**
 
    ```http
    GET /compact/:chainId/:claimHash
    ```
-
-   Requires a valid session ID in the `x-session-id` header.
 
    Example response:
 
@@ -259,20 +192,18 @@ Note that `nonce` can be provided as `null` in which case the next available val
        "id": "0x300000000000000000000000000000000000000000000000000000000000001c",
        "amount": "1000000000000000000",
        "witnessTypeString": "ExampleWitness exampleWitness)ExampleWitness(uint256 foo, bytes32 bar)",
-       "witnessHash": "0x0000000000000000000000000000000000000000000000000000000000000123"
+       "witnessHash": "0x0000000000000000000000000000000000000000000000000000000123"
      },
      "signature": "0x1234...7890",
      "createdAt": "2024-03-07T12:00:00Z"
    }
    ```
 
-4. **Get Resource Lock Balance**
+5. **Get Resource Lock Balance**
 
    ```http
    GET /balance/:chainId/:lockId
    ```
-
-   Requires a valid session ID in the `x-session-id` header.
 
    Returns balance information for a specific resource lock. Example response:
 
@@ -288,6 +219,7 @@ Note that `nonce` can be provided as `null` in which case the next available val
    The `allocatableBalance` will be the current balance minus the sum of any unfinalized deposits or inbound transfers. The period after which these are considered finalized is configurable for each chain.
 
    The `allocatedBalance` will be the sum of any submitted compacts that:
+
    - have not been processed (as confirmed by a `Claim` event with the respective claim hash in a finalized block)
    - have not expired (as confirmed by a finalized block with a timestamp exceeding the `expires` value)
 
@@ -297,12 +229,11 @@ Note that `nonce` can be provided as `null` in which case the next available val
    - `"0"` if `allocatedBalance` >= `allocatableBalance`
    - `allocatableBalance - allocatedBalance` otherwise
 
-5. **Get All Resource Lock Balances**
+6. **Get All Resource Lock Balances**
+
    ```http
    GET /balances
    ```
-
-   Requires a valid session ID in the `x-session-id` header.
 
    Returns balance information for all resource locks managed by this allocator. Example response:
 
@@ -323,22 +254,6 @@ Note that `nonce` can be provided as `null` in which case the next available val
 
    Each balance entry follows the same rules as the single balance endpoint.
 
-6. **Get Suggested Nonce**
-   ```http
-   GET /suggested-nonce/:chainId
-   ```
-   
-   Requires a valid session ID in the `x-session-id` header.
-
-   Returns the next available unused nonce for the account on the session for creating new compacts on a specific chain.
-
-   Example response:
-   ```json
-   {
-     "nonce": "0x70997970C51812dc3A010C7d01b50e0d17dc79C800000000000000000000001"
-   }
-   ```
-
 ## Development
 
 ### Prerequisites
@@ -352,7 +267,7 @@ Note that `nonce` can be provided as `null` in which case the next available val
 ```bash
 ### Configuration & Installation ###
 # 1. Clone this repo and enter cloned directory
-git clone git@github.com:Uniswap/smallocator.git && cd smallocator
+git clone git@github.com:Uniswap/autocator.git && cd autocator
 
 # 2. Copy example environment file (modify as needed)
 cp .env.example .env
