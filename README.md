@@ -332,6 +332,83 @@ Pre-commit hooks ensure:
 - No TypeScript errors
 - No ESLint warnings
 
+## Deployment
+
+The project includes a setup script for deploying to a cloud server with automatic HTTPS configuration using Let's Encrypt.
+
+### Prerequisites
+
+- A domain name pointing to your server (A record)
+- unix cloud server (e.g., Ubuntu 22.04 LTS)
+- SSH access to the server
+
+### Deployment Steps
+
+1. SSH into your server:
+
+```bash
+ssh user@your-server
+```
+
+2. Clone the repository:
+
+```bash
+git clone https://github.com/Uniswap/autocator.git
+cd autocator
+```
+
+3. Run the setup script with your domain and IP:
+
+```bash
+./scripts/setup-server.sh your-domain.com your-server-ip
+```
+
+For example:
+
+```bash
+./scripts/setup-server.sh autocator.org 157.230.64.12
+```
+
+The script will:
+
+- Install required dependencies (Node.js, pnpm, nginx, certbot)
+- Set up the project in /opt/autocator
+- Configure nginx with proper routing and CORS support
+- Set up SSL certificates with Let's Encrypt
+- Create and enable a systemd service
+- Start the server
+
+The deployment is configured to fully support CORS (Cross-Origin Resource Sharing), allowing API endpoints to be accessed from any domain. This makes it easy to integrate with frontend applications hosted on different domains.
+
+During the setup process, you'll be prompted to update the `.env` file with your configuration, particularly:
+
+- `PRIVATE_KEY`: Your private key for signing compacts
+- `ALLOCATOR_ADDRESS`: The address of your allocator
+- `SIGNING_ADDRESS`: The address derived from your private key
+- `INDEXER_URL`: The URL of The Compact Indexer
+
+### Monitoring
+
+Monitor the server status:
+
+```bash
+sudo systemctl status autocator
+```
+
+View server logs:
+
+```bash
+sudo journalctl -u autocator -f
+```
+
+### Testing Deployed Server
+
+Test the health endpoint:
+
+```bash
+curl https://your-domain.com/health
+```
+
 ## License
 
 MIT
