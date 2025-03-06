@@ -7,14 +7,9 @@ import {
   cleanupTestServer,
 } from './utils/test-server';
 import { submitCompact } from '../compact';
-import {
-  OnchainRegistrationStatus,
-  RegisteredCompactResponse,
-} from '../validation';
 import { GraphQLClient } from 'graphql-request';
-import { RequestDocument, Variables, RequestOptions } from 'graphql-request';
+import { RequestDocument, RequestOptions } from 'graphql-request';
 import { dbManager } from './setup';
-import { randomUUID } from 'crypto';
 
 describe('Onchain Registration Integration', () => {
   let server: FastifyInstance;
@@ -92,9 +87,9 @@ describe('Onchain Registration Integration', () => {
       '0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890';
 
     // Mock GraphQL response for onchain registration check
-    GraphQLClient.prototype.request = async <T = any>(
+    GraphQLClient.prototype.request = async <T>(
       _document: RequestDocument | RequestOptions,
-      ..._variablesAndRequestHeaders: any[]
+      ..._variablesAndRequestHeaders: unknown[]
     ): Promise<T> => {
       // Get current time in seconds
       const currentTime = Math.floor(Date.now() / 1000);
@@ -141,9 +136,9 @@ describe('Onchain Registration Integration', () => {
       '0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890';
 
     // Mock GraphQL response for onchain registration check
-    GraphQLClient.prototype.request = async <T = any>(
+    GraphQLClient.prototype.request = async <T>(
       _document: RequestDocument | RequestOptions,
-      ..._variablesAndRequestHeaders: any[]
+      ..._variablesAndRequestHeaders: unknown[]
     ): Promise<T> => {
       // Return null for registeredCompact (not found)
       return {
@@ -176,9 +171,9 @@ describe('Onchain Registration Integration', () => {
       '0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890';
 
     // Mock GraphQL response for onchain registration check
-    GraphQLClient.prototype.request = async <T = any>(
+    GraphQLClient.prototype.request = async <T>(
       _document: RequestDocument | RequestOptions,
-      ..._variablesAndRequestHeaders: any[]
+      ..._variablesAndRequestHeaders: unknown[]
     ): Promise<T> => {
       // Get current time in seconds
       const currentTime = Math.floor(Date.now() / 1000);
@@ -222,9 +217,9 @@ describe('Onchain Registration Integration', () => {
       '0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890';
 
     // Mock GraphQL response for onchain registration check
-    GraphQLClient.prototype.request = async <T = any>(
+    GraphQLClient.prototype.request = async <T>(
       _document: RequestDocument | RequestOptions,
-      ..._variablesAndRequestHeaders: any[]
+      ..._variablesAndRequestHeaders: unknown[]
     ): Promise<T> => {
       // Get current time in seconds
       const currentTime = Math.floor(Date.now() / 1000);
@@ -268,9 +263,9 @@ describe('Onchain Registration Integration', () => {
       '0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890';
 
     // Mock GraphQL response for onchain registration check
-    GraphQLClient.prototype.request = async <T = any>(
+    GraphQLClient.prototype.request = async <T>(
       _document: RequestDocument | RequestOptions,
-      ..._variablesAndRequestHeaders: any[]
+      ..._variablesAndRequestHeaders: unknown[]
     ): Promise<T> => {
       // Get current time in seconds
       const currentTime = Math.floor(Date.now() / 1000);
@@ -317,9 +312,9 @@ describe('Onchain Registration Integration', () => {
       '0x1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890';
 
     // Mock GraphQL response for onchain registration check
-    GraphQLClient.prototype.request = async <T = any>(
+    GraphQLClient.prototype.request = async <T>(
       _document: RequestDocument | RequestOptions,
-      ..._variablesAndRequestHeaders: any[]
+      ..._variablesAndRequestHeaders: unknown[]
     ): Promise<T> => {
       // Get current time in seconds
       const currentTime = Math.floor(Date.now() / 1000);

@@ -13,7 +13,6 @@ import {
   AccountResponse,
   fetchAndCacheSupportedChains,
 } from '../../graphql';
-import { signMessage } from 'viem/accounts';
 
 describe('Integration Tests', () => {
   let server: FastifyInstance;
@@ -42,12 +41,30 @@ describe('Integration Tests', () => {
   });
 
   // Helper to convert API compact to the format expected by generateValidCompactSignature
-  function apiCompactToStoredCompact(compact: any): any {
+  function apiCompactToStoredCompact(compact: {
+    id: string;
+    arbiter: string;
+    sponsor: string;
+    nonce: string | null;
+    expires: string;
+    amount: string;
+    witnessTypeString: string | null;
+    witnessHash: string | null;
+  }): {
+    id: bigint;
+    arbiter: string;
+    sponsor: string;
+    nonce: bigint;
+    expires: bigint;
+    amount: string;
+    witnessTypeString: string | null;
+    witnessHash: string | null;
+  } {
     return {
       id: BigInt(compact.id),
       arbiter: compact.arbiter,
       sponsor: compact.sponsor,
-      nonce: BigInt(compact.nonce),
+      nonce: compact.nonce ? BigInt(compact.nonce) : BigInt(0),
       expires: BigInt(compact.expires),
       amount: compact.amount,
       witnessTypeString: compact.witnessTypeString,

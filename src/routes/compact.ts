@@ -65,7 +65,7 @@ export async function setupCompactRoutes(
         let normalizedAccount: string;
         try {
           normalizedAccount = getAddress(account);
-        } catch (error) {
+        } catch {
           reply.code(400);
           return { error: 'Invalid account address format' };
         }
@@ -163,7 +163,7 @@ export async function setupCompactRoutes(
         let normalizedSponsor: string;
         try {
           normalizedSponsor = getAddress(sponsor);
-        } catch (error) {
+        } catch {
           reply.code(400);
           return { error: 'Invalid sponsor address format' };
         }

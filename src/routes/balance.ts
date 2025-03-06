@@ -47,7 +47,7 @@ export async function setupBalanceRoutes(
         let normalizedSponsor: string;
         try {
           normalizedSponsor = getAddress(sponsor);
-        } catch (error) {
+        } catch {
           reply.code(400);
           return { error: 'Invalid sponsor address format' };
         }
@@ -192,7 +192,7 @@ export async function setupBalanceRoutes(
         let normalizedSponsor: string;
         try {
           normalizedSponsor = getAddress(sponsor);
-        } catch (error) {
+        } catch {
           reply.code(400);
           return { error: 'Invalid sponsor address format' };
         }

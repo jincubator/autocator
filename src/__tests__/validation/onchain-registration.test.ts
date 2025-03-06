@@ -2,14 +2,24 @@ import { GraphQLClient } from 'graphql-request';
 import {
   checkOnchainRegistration,
   OnchainRegistrationStatus,
-  RegisteredCompactResponse,
 } from '../../validation/onchain-registration';
-import { RequestDocument, Variables, RequestOptions } from 'graphql-request';
 import { getFinalizationThreshold } from '../../chain-config';
 
 // Create a mock implementation for GraphQLClient.prototype.request
 type MockGraphQLResponse = {
-  registeredCompact: any;
+  registeredCompact: {
+    blockNumber: string;
+    timestamp: string;
+    typehash: string;
+    expires: string;
+    sponsor: {
+      address: string;
+    };
+    claim: {
+      blockNumber: string;
+      timestamp: string;
+    } | null;
+  } | null;
 };
 
 // Store original functions to restore later
@@ -59,8 +69,7 @@ describe('Onchain Registration Validation', () => {
   });
 
   it('should return PENDING when registration is not yet finalized', async () => {
-    // Get the finalization threshold for chain ID 1
-    const finalizationThreshold = getFinalizationThreshold('1'); // 25 seconds for Ethereum Mainnet
+    // 25 seconds for Ethereum Mainnet
 
     // Mock GraphQL response with a recent registration (not yet finalized)
     const registrationTimestamp = mockCurrentTime - 5; // 5 seconds ago
@@ -84,13 +93,12 @@ describe('Onchain Registration Validation', () => {
     );
 
     expect(result.status).toBe(OnchainRegistrationStatus.PENDING);
-    expect(result.timeUntilFinalized).toBe(finalizationThreshold - 5); // Remaining seconds until finalized
+    expect(result.timeUntilFinalized).toBe(getFinalizationThreshold('1') - 5); // Remaining seconds until finalized
     expect(result.registeredCompact).toBeDefined();
   });
 
   it('should return ACTIVE when registration is finalized and not expired', async () => {
-    // Get the finalization threshold for chain ID 1
-    const finalizationThreshold = getFinalizationThreshold('1'); // 25 seconds for Ethereum Mainnet
+    // 25 seconds for Ethereum Mainnet
 
     // Mock GraphQL response with a finalized registration
     const registrationTimestamp = mockCurrentTime - 30; // 30 seconds ago (past finalization of 25 seconds)
@@ -118,8 +126,7 @@ describe('Onchain Registration Validation', () => {
   });
 
   it('should return EXPIRED when registration is past expiration plus finalization', async () => {
-    // Get the finalization threshold for chain ID 1
-    const finalizationThreshold = getFinalizationThreshold('1'); // 25 seconds for Ethereum Mainnet
+    // 25 seconds for Ethereum Mainnet
 
     // Mock GraphQL response with an expired registration
     const registrationTimestamp = mockCurrentTime - 3600; // 1 hour ago
@@ -148,8 +155,7 @@ describe('Onchain Registration Validation', () => {
   });
 
   it('should return CLAIM_PENDING when claim is not yet finalized', async () => {
-    // Get the finalization threshold for chain ID 1
-    const finalizationThreshold = getFinalizationThreshold('1'); // 25 seconds for Ethereum Mainnet
+    // 25 seconds for Ethereum Mainnet
 
     // Mock GraphQL response with a registration that has a pending claim
     const registrationTimestamp = mockCurrentTime - 3600; // 1 hour ago
@@ -177,13 +183,14 @@ describe('Onchain Registration Validation', () => {
     );
 
     expect(result.status).toBe(OnchainRegistrationStatus.CLAIM_PENDING);
-    expect(result.timeUntilClaimFinalized).toBe(finalizationThreshold - 5); // Remaining seconds until claim is finalized
+    expect(result.timeUntilClaimFinalized).toBe(
+      getFinalizationThreshold('1') - 5
+    ); // Remaining seconds until claim is finalized
     expect(result.registeredCompact).toBeDefined();
   });
 
   it('should return CLAIMED when claim is finalized', async () => {
-    // Get the finalization threshold for chain ID 1
-    const finalizationThreshold = getFinalizationThreshold('1'); // 25 seconds for Ethereum Mainnet
+    // 25 seconds for Ethereum Mainnet
 
     // Mock GraphQL response with a registration that has a finalized claim
     const registrationTimestamp = mockCurrentTime - 3600; // 1 hour ago

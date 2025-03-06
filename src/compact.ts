@@ -12,7 +12,6 @@ import {
   type CompactMessage,
   type ValidatedCompactMessage,
   storeNonce,
-  generateNonce,
   checkOnchainRegistration,
   OnchainRegistrationStatus,
 } from './validation';

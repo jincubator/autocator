@@ -1,10 +1,10 @@
 import fastify, { FastifyInstance } from 'fastify';
-import env from '@fastify/env';
+// import env from '@fastify/env'; // Not used
 import cors from '@fastify/cors';
-import { randomUUID } from 'crypto';
+// import { randomUUID } from 'crypto'; // Not used
 import { setupRoutes } from '../../routes';
 import { dbManager } from '../setup';
-import { signMessage, sign, privateKeyToAccount } from 'viem/accounts';
+import { signMessage, sign } from 'viem/accounts';
 import {
   getAddress,
   encodeAbiParameters,
@@ -18,7 +18,7 @@ import { setupGraphQLMocks } from './graphql-mock';
 import { fetchAndCacheSupportedChains } from '../../graphql';
 
 // Helper to generate test data
-const defaultBaseUrl = 'https://autocator.example';
+// const defaultBaseUrl = 'https://autocator.example'; // Not used
 export const validPayload = {
   address: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
 };
