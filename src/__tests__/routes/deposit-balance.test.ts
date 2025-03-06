@@ -109,7 +109,7 @@ describe('Deposit Balance Routes', () => {
     // Get balances
     const response = await server.inject({
       method: 'GET',
-      url: `/balances?sponsor=${sponsorAddress}`,
+      url: `/balances/${sponsorAddress}`,
     });
 
     expect(response.statusCode).toBe(200);
@@ -196,7 +196,7 @@ describe('Deposit Balance Routes', () => {
     // Get balances
     const response = await server.inject({
       method: 'GET',
-      url: `/balances?sponsor=${sponsorAddress}`,
+      url: `/balances/${sponsorAddress}`,
     });
 
     expect(response.statusCode).toBe(200);
@@ -292,7 +292,7 @@ describe('Deposit Balance Routes', () => {
     // Get balances
     const response = await server.inject({
       method: 'GET',
-      url: `/balances?sponsor=${sponsorAddress}`,
+      url: `/balances/${sponsorAddress}`,
     });
 
     expect(response.statusCode).toBe(200);
@@ -494,7 +494,7 @@ describe('Deposit Balance Routes', () => {
     // Get balances
     const response = await server.inject({
       method: 'GET',
-      url: `/balances?sponsor=${sponsorAddress}`,
+      url: `/balances/${sponsorAddress}`,
     });
 
     expect(response.statusCode).toBe(200);
@@ -696,7 +696,7 @@ describe('Deposit Balance Routes', () => {
     // Get balances
     const response = await server.inject({
       method: 'GET',
-      url: `/balances?sponsor=${sponsorAddress}`,
+      url: `/balances/${sponsorAddress}`,
     });
 
     expect(response.statusCode).toBe(200);

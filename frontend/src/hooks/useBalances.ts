@@ -56,7 +56,7 @@ export function useBalances(): UseBalancesResult {
     isFetchingRef.current = true;
 
     try {
-      const response = await fetch('/balances');
+      const response = await fetch(`/balances/${address}`);
 
       if (!response.ok) throw new Error('Failed to fetch balances.');
 

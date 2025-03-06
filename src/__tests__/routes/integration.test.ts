@@ -151,7 +151,7 @@ describe('Integration Tests', () => {
       // 3. Verify updated balance
       const updatedBalanceResponse = await server.inject({
         method: 'GET',
-        url: `/balance/1/${freshCompact.id}?sponsor=${sponsorAddress}`,
+        url: `/balance/1/${freshCompact.id}/${sponsorAddress}`,
       });
       expect(updatedBalanceResponse.statusCode).toBe(200);
       const updatedBalance = JSON.parse(updatedBalanceResponse.payload);

@@ -22,12 +22,12 @@ export async function setupBalanceRoutes(
 ): Promise<void> {
   // Get balance for all resource locks for a specific sponsor
   server.get<{
-    Querystring: { sponsor: string };
+    Params: { sponsor: string };
   }>(
-    '/balances',
+    '/balances/:sponsor',
     async (
       request: FastifyRequest<{
-        Querystring: { sponsor: string };
+        Params: { sponsor: string };
       }>,
       reply: FastifyReply
     ): Promise<
@@ -37,12 +37,7 @@ export async function setupBalanceRoutes(
       | { error: string }
     > => {
       try {
-        const { sponsor } = request.query;
-
-        if (!sponsor) {
-          reply.code(400);
-          return { error: 'Sponsor address is required' };
-        }
+        const { sponsor } = request.params;
 
         let normalizedSponsor: string;
         try {
@@ -169,25 +164,17 @@ export async function setupBalanceRoutes(
 
   // Get available balance for a specific lock
   server.get<{
-    Params: { chainId: string; lockId: string };
-    Querystring: { sponsor: string };
+    Params: { chainId: string; lockId: string; sponsor: string };
   }>(
-    '/balance/:chainId/:lockId',
+    '/balance/:chainId/:lockId/:sponsor',
     async (
       request: FastifyRequest<{
-        Params: { chainId: string; lockId: string };
-        Querystring: { sponsor: string };
+        Params: { chainId: string; lockId: string; sponsor: string };
       }>,
       reply: FastifyReply
     ) => {
       try {
-        const { chainId, lockId } = request.params;
-        const { sponsor } = request.query;
-
-        if (!sponsor) {
-          reply.code(400);
-          return { error: 'Sponsor address is required' };
-        }
+        const { chainId, lockId, sponsor } = request.params;
 
         let normalizedSponsor: string;
         try {

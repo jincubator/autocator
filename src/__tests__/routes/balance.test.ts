@@ -93,7 +93,7 @@ describe('Balance Routes', () => {
 
       const response = await server.inject({
         method: 'GET',
-        url: `/balance/1/${lockId}?sponsor=${sponsorAddress}`,
+        url: `/balance/1/${lockId}/${sponsorAddress}`,
       });
 
       expect(response.statusCode).toBe(200);
@@ -110,7 +110,7 @@ describe('Balance Routes', () => {
       expect(typeof result.withdrawalStatus).toBe('number');
     });
 
-    it('should return 400 without sponsor', async () => {
+    it('should return 404 for missing path parameter', async () => {
       const freshCompact = getFreshCompact();
       const lockId = freshCompact.id.toString();
 
@@ -119,9 +119,7 @@ describe('Balance Routes', () => {
         url: `/balance/1/${lockId}`,
       });
 
-      expect(response.statusCode).toBe(400);
-      const result = JSON.parse(response.payload);
-      expect(result.error).toBe('Sponsor address is required');
+      expect(response.statusCode).toBe(404);
     });
 
     it('should return 404 for non-existent lock', async () => {
@@ -174,7 +172,7 @@ describe('Balance Routes', () => {
       try {
         const response = await server.inject({
           method: 'GET',
-          url: `/balance/1/0x0000000000000000000000000000000000000000000000000000000000000000?sponsor=${sponsorAddress}`,
+          url: `/balance/1/0x0000000000000000000000000000000000000000000000000000000000000000/${sponsorAddress}`,
         });
 
         expect(response.statusCode).toBe(404);
@@ -242,7 +240,7 @@ describe('Balance Routes', () => {
 
         const response = await server.inject({
           method: 'GET',
-          url: `/balance/1/${lockId}?sponsor=${sponsorAddress}`,
+          url: `/balance/1/${lockId}/${sponsorAddress}`,
         });
 
         expect(response.statusCode).toBe(200);
@@ -344,7 +342,7 @@ describe('Balance Routes', () => {
       try {
         const response = await server.inject({
           method: 'GET',
-          url: `/balances?sponsor=${sponsorAddress}`,
+          url: `/balances/${sponsorAddress}`,
         });
 
         expect(response.statusCode).toBe(200);
@@ -367,15 +365,15 @@ describe('Balance Routes', () => {
       }
     });
 
-    it('should return 400 without sponsor', async () => {
+    it('should return 400 with invalid sponsor address format', async () => {
       const response = await server.inject({
         method: 'GET',
-        url: '/balances',
+        url: '/balances/invalid-address',
       });
 
       expect(response.statusCode).toBe(400);
       const result = JSON.parse(response.payload);
-      expect(result.error).toBe('Sponsor address is required');
+      expect(result.error).toBe('Invalid sponsor address format');
     });
 
     it('should handle case when no resource locks exist', async () => {
@@ -422,7 +420,7 @@ describe('Balance Routes', () => {
       try {
         const response = await server.inject({
           method: 'GET',
-          url: `/balances?sponsor=${sponsorAddress}`,
+          url: `/balances/${sponsorAddress}`,
         });
 
         expect(response.statusCode).toBe(200);
