@@ -464,7 +464,7 @@ export function useTransfer(
       });
 
       // Sign the message using wagmi's signTypedDataAsync
-      let userSignature = await signTypedDataAsync({
+      const userSignature = await signTypedDataAsync({
         domain,
         message,
         primaryType: 'Compact',
