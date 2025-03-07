@@ -186,19 +186,25 @@ let serverInstances: FastifyInstance[] = [];
 
 // Create a test server instance
 export async function createTestServer(): Promise<FastifyInstance> {
+  // Configure logger based on environment
+  const isProd = process.env.NODE_ENV === 'production';
   const server = fastify({
-    logger: {
-      level: 'error',
-      transport: {
-        target: 'pino-pretty',
-        options: {
-          translateTime: 'HH:MM:ss Z',
-          ignore: 'pid,hostname,reqId,responseTime,req,res',
-          colorize: true,
-          messageFormat: '{msg}',
+    logger: isProd
+      ? {
+          level: 'error',
+        }
+      : {
+          level: 'error',
+          transport: {
+            target: 'pino-pretty',
+            options: {
+              translateTime: 'HH:MM:ss Z',
+              ignore: 'pid,hostname,reqId,responseTime,req,res',
+              colorize: true,
+              messageFormat: '{msg}',
+            },
+          },
         },
-      },
-    },
   });
 
   try {

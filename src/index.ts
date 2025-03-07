@@ -14,19 +14,25 @@ import {
 } from './graphql';
 import cors from '@fastify/cors'; // Import cors plugin
 
+// Configure logger based on environment
+const isProd = process.env.NODE_ENV === 'production';
 const server = fastify({
-  logger: {
-    level: 'info',
-    transport: {
-      target: 'pino-pretty',
-      options: {
-        translateTime: 'HH:MM:ss Z',
-        ignore: 'pid,hostname,reqId,responseTime,req,res',
-        colorize: true,
-        messageFormat: '{msg}',
+  logger: isProd
+    ? {
+        level: 'info',
+      }
+    : {
+        level: 'info',
+        transport: {
+          target: 'pino-pretty',
+          options: {
+            translateTime: 'HH:MM:ss Z',
+            ignore: 'pid,hostname,reqId,responseTime,req,res',
+            colorize: true,
+            messageFormat: '{msg}',
+          },
+        },
       },
-    },
-  },
   disableRequestLogging: true,
 });
 

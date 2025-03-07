@@ -26,7 +26,7 @@
     "type-check:staged-files": "tsc --noEmit --skipLibCheck --skipDefaultLibCheck",
     "format": "prettier --write \"src/**/*.ts\" && cd frontend && prettier --write \"src/**/*.{ts,tsx}\" && cd -",
     "format:check": "prettier --check \"src/**/*.ts\" && cd frontend && prettier --check \"src/**/*.{ts,tsx}\" && cd -",
-    "prepare": "husky",
+    "prepare": "husky install",
     "check-test-files": "node scripts/check-test-files.js",
     "lint-staged": "lint-staged",
     "check:all": "pnpm build:all || true && pnpm lint || true && cd frontend && pnpm lint || true && cd - && pnpm format:check || true && pnpm type-check || true && cd frontend && pnpm tsc --noEmit -p tsconfig.app.json || true && cd - && pnpm test:parallel || true && pnpm smoke-test || true"
