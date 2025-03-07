@@ -344,20 +344,50 @@ The project includes a setup script for deploying to a cloud server with automat
 
 ### Deployment Steps
 
-1. SSH into your server:
+#### Build Locally
+
+Since the server might have limited resources, it's recommended to build the project locally first:
+
+1. Clone and set up the repository locally:
+
+```bash
+# On your local machine
+git clone https://github.com/Uniswap/autocator.git
+cd autocator
+pnpm install:all
+```
+
+2. Create a production .env file:
+
+```bash
+cp .env.example .env
+# Edit .env with your production configuration
+```
+
+3. Build the project:
+
+```bash
+pnpm build:all
+```
+
+This will create the `dist` directory with both the backend and frontend builds, and will include your .env file in the dist directory.
+
+#### Deploy to Server
+
+4. SSH into your server:
 
 ```bash
 ssh user@your-server
 ```
 
-2. Clone the repository:
+5. Clone the repository on the server:
 
 ```bash
 git clone https://github.com/Uniswap/autocator.git
 cd autocator
 ```
 
-3. Run the setup script with your domain and IP:
+6. Run the setup script with your domain and IP:
 
 ```bash
 ./scripts/setup-server.sh your-domain.com your-server-ip
@@ -369,7 +399,14 @@ For example:
 ./scripts/setup-server.sh autocator.org 157.230.64.12
 ```
 
-The script will:
+7. Transfer the built files from your local machine to the server:
+
+```bash
+# From your local repository
+scp -r dist/* user@your-server:/opt/autocator/dist/
+```
+
+The setup script will:
 
 - Install required dependencies (Node.js, pnpm, nginx, certbot)
 - Set up the project in /opt/autocator
@@ -380,7 +417,7 @@ The script will:
 
 The deployment is configured to fully support CORS (Cross-Origin Resource Sharing), allowing API endpoints to be accessed from any domain. This makes it easy to integrate with frontend applications hosted on different domains.
 
-During the setup process, you'll be prompted to update the `.env` file with your configuration, particularly:
+Make sure your local .env file includes these key environment variables before building:
 
 - `PRIVATE_KEY`: Your private key for signing compacts
 - `ALLOCATOR_ADDRESS`: The address of your allocator

@@ -37,10 +37,9 @@ echo "Copying repository..."
 cp -r . $PROJECT_DIR/
 cd $PROJECT_DIR
 
-# Install dependencies and build
-echo "Installing dependencies and building..."
-pnpm install:all
-pnpm build:all
+# Install dependencies (but don't build - we'll transfer built files from local machine)
+echo "Installing dependencies..."
+pnpm install --prod
 
 # Create .env file from example if it doesn't exist
 if [ ! -f ".env" ]; then
@@ -81,12 +80,6 @@ EOL
 # Configure nginx
 echo "Configuring nginx..."
 sudo tee /etc/nginx/sites-available/autocator > /dev/null << EOL
-# Define CORS headers
-map \$request_method \$cors_method {
-    OPTIONS 'true';
-    default 'false';
-}
-
 server {
     server_name $DOMAIN;
     listen 80;
@@ -95,28 +88,17 @@ server {
     root $PROJECT_DIR/dist/frontend;
     index index.html;
 
-    # CORS pre-flight request handling
-    if (\$cors_method = 'true') {
-        add_header 'Access-Control-Allow-Origin' '*' always;
-        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE' always;
-        add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
-        add_header 'Access-Control-Max-Age' 1728000 always;
-        add_header 'Content-Type' 'text/plain; charset=utf-8' always;
-        add_header 'Content-Length' 0 always;
-        return 204;
-    }
-
-    location / {
-        try_files \$uri \$uri/ /index.html;
-    }
-
-    # API endpoints with CORS support
+    # API endpoints
     location ~ ^/(health|suggested-nonce|compact|compacts|balance|balances|session) {
-        # Add CORS headers for all API responses
-        add_header 'Access-Control-Allow-Origin' '*' always;
-        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE' always;
-        add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
-        add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
+        # Simple CORS configuration
+        add_header 'Access-Control-Allow-Origin' '*';
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE';
+        add_header 'Access-Control-Allow-Headers' '*';
+        
+        # Handle OPTIONS method for CORS preflight
+        if (\$request_method = 'OPTIONS') {
+            return 204;
+        }
 
         # Proxy to backend
         proxy_pass http://localhost:3000;
@@ -125,6 +107,11 @@ server {
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    # Frontend files
+    location / {
+        try_files \$uri \$uri/ /index.html;
     }
 }
 EOL
