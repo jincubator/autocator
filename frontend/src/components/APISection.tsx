@@ -10,10 +10,8 @@ interface APIEndpoint {
 
 const APISection: React.FC = () => {
   const typeDefinitions = {
-    EIP4361Payload:
-      '{domain, address, uri, statement, version, chainId: number, nonce, issuedAt, expirationTime}',
     Compact:
-      '{arbiter, sponsor, nonce?, expires, id, amount, witnessTypeString?, witnessHash?}',
+      '{arbiter, sponsor, nonce, expires, id, amount, witnessTypeString?, witnessHash?}',
     SupportedChains:
       '[{chainId, allocatorId, finalizationThresholdSeconds: number}]',
   };
@@ -28,31 +26,15 @@ const APISection: React.FC = () => {
       },
       {
         method: 'GET',
-        path: '/session/:chainId/:address',
-        response: '{payload: EIP4361Payload}',
+        path: '/suggested-nonce/:chainId/:account',
+        response: '{nonce}',
       },
     ],
-    Authenticated: [
-      {
-        method: 'POST',
-        path: '/session',
-        request: '{signature, payload: EIP4361Payload}',
-        response: '{sessionId}',
-      },
-      {
-        method: 'GET',
-        path: '/session',
-        response: '{session: {id, address, expiresAt}}',
-      },
-      {
-        method: 'DELETE',
-        path: '/session',
-        response: '{success: boolean}',
-      },
+    Endpoints: [
       {
         method: 'POST',
         path: '/compact',
-        request: '{chainId, compact: Compact}',
+        request: '{chainId, compact: Compact, sponsorSignature: string}',
         response: '{hash, signature, nonce}',
       },
       {
@@ -62,23 +44,18 @@ const APISection: React.FC = () => {
       },
       {
         method: 'GET',
-        path: '/compacts',
+        path: '/compacts/:account',
         response: '[{chainId, hash, compact: Compact, signature, createdAt}]',
       },
       {
         method: 'GET',
-        path: '/suggested-nonce/:chainId',
-        response: '{nonce}',
-      },
-      {
-        method: 'GET',
-        path: '/balance/:chainId/:lockId',
+        path: '/balance/:chainId/:lockId/:account',
         response:
           '{allocatableBalance, allocatedBalance, balanceAvailableToAllocate, withdrawalStatus: number}',
       },
       {
         method: 'GET',
-        path: '/balances',
+        path: '/balances/:account',
         response:
           '{balances: [{chainId, lockId, allocatableBalance, allocatedBalance, balanceAvailableToAllocate, withdrawalStatus: number}]}',
       },
@@ -114,15 +91,6 @@ const APISection: React.FC = () => {
           <div key={category}>
             <h3 className="text-[0.95rem] font-semibold text-[#00ff00] mb-0.5">
               {category} Endpoints
-              {category === 'Authenticated' && (
-                <span className="text-xs font-normal text-gray-400 ml-2">
-                  (requires{' '}
-                  <code className="bg-gray-800 px-1 rounded">
-                    x-session-id: session
-                  </code>{' '}
-                  header)
-                </span>
-              )}
             </h3>
             <div className="space-y-1.5">
               {endpoints.map((endpoint, index) => (

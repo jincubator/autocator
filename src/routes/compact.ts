@@ -141,34 +141,29 @@ export async function setupCompactRoutes(
     }
   );
 
-  // Get compacts for a specific sponsor
+  // Get compacts for a specific account
   server.get<{
-    Querystring: { sponsor: string };
+    Params: { account: string };
   }>(
-    '/compacts',
+    '/compacts/:account',
     async (
       request: FastifyRequest<{
-        Querystring: { sponsor: string };
+        Params: { account: string };
       }>,
       reply: FastifyReply
     ) => {
       try {
-        const { sponsor } = request.query;
+        const { account } = request.params;
 
-        if (!sponsor) {
-          reply.code(400);
-          return { error: 'Sponsor address is required' };
-        }
-
-        let normalizedSponsor: string;
+        let normalizedAccount: string;
         try {
-          normalizedSponsor = getAddress(sponsor);
+          normalizedAccount = getAddress(account);
         } catch {
           reply.code(400);
-          return { error: 'Invalid sponsor address format' };
+          return { error: 'Invalid account address format' };
         }
 
-        const compacts = await getCompactsByAddress(server, normalizedSponsor);
+        const compacts = await getCompactsByAddress(server, normalizedAccount);
 
         // Serialize BigInt values to strings for JSON serialization
         const serializedCompacts = compacts.map((compact) => ({

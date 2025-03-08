@@ -384,8 +384,8 @@ describe('Compact Routes', () => {
     });
   });
 
-  describe('GET /compacts', () => {
-    it('should return compacts for a specific sponsor', async () => {
+  describe('GET /compacts/:account', () => {
+    it('should return compacts for a specific account', async () => {
       // First submit a compact to ensure there's data
       const freshCompact = getFreshCompact();
       const compactData = compactToAPI(freshCompact);
@@ -405,10 +405,10 @@ describe('Compact Routes', () => {
         },
       });
 
-      // Now get compacts for this sponsor
+      // Now get compacts for this account
       const response = await server.inject({
         method: 'GET',
-        url: `/compacts?sponsor=${freshCompact.sponsor}`,
+        url: `/compacts/${freshCompact.sponsor}`,
       });
 
       expect(response.statusCode).toBe(200);
@@ -416,15 +416,15 @@ describe('Compact Routes', () => {
       expect(Array.isArray(result)).toBe(true);
     });
 
-    it('should reject request without sponsor', async () => {
+    it('should reject request with invalid account address', async () => {
       const response = await server.inject({
         method: 'GET',
-        url: '/compacts',
+        url: '/compacts/0xinvalid',
       });
 
       expect(response.statusCode).toBe(400);
       const result = JSON.parse(response.payload);
-      expect(result.error).toBe('Sponsor address is required');
+      expect(result.error).toBe('Invalid account address format');
     });
   });
 

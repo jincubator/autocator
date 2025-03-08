@@ -365,7 +365,7 @@ describe('Balance Routes', () => {
       }
     });
 
-    it('should return 400 with invalid sponsor address format', async () => {
+    it('should return 400 with invalid account address format', async () => {
       const response = await server.inject({
         method: 'GET',
         url: '/balances/invalid-address',
@@ -373,7 +373,7 @@ describe('Balance Routes', () => {
 
       expect(response.statusCode).toBe(400);
       const result = JSON.parse(response.payload);
-      expect(result.error).toBe('Invalid sponsor address format');
+      expect(result.error).toBe('Invalid account address format');
     });
 
     it('should handle case when no resource locks exist', async () => {

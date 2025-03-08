@@ -20,14 +20,14 @@ interface Balance {
 export async function setupBalanceRoutes(
   server: FastifyInstance
 ): Promise<void> {
-  // Get balance for all resource locks for a specific sponsor
+  // Get balance for all resource locks for a specific account
   server.get<{
-    Params: { sponsor: string };
+    Params: { account: string };
   }>(
-    '/balances/:sponsor',
+    '/balances/:account',
     async (
       request: FastifyRequest<{
-        Params: { sponsor: string };
+        Params: { account: string };
       }>,
       reply: FastifyReply
     ): Promise<
@@ -37,18 +37,18 @@ export async function setupBalanceRoutes(
       | { error: string }
     > => {
       try {
-        const { sponsor } = request.params;
+        const { account } = request.params;
 
-        let normalizedSponsor: string;
+        let normalizedAccount: string;
         try {
-          normalizedSponsor = getAddress(sponsor);
+          normalizedAccount = getAddress(account);
         } catch {
           reply.code(400);
-          return { error: 'Invalid sponsor address format' };
+          return { error: 'Invalid account address format' };
         }
 
-        // Get all resource locks for the sponsor
-        const response = await getAllResourceLocks(normalizedSponsor);
+        // Get all resource locks for the account
+        const response = await getAllResourceLocks(normalizedAccount);
 
         // Add defensive checks
         if (!response?.account?.resourceLocks?.items) {
@@ -74,7 +74,7 @@ export async function setupBalanceRoutes(
               // Get details from GraphQL
               const lockDetails = await getCompactDetails({
                 allocator: process.env.ALLOCATOR_ADDRESS!,
-                sponsor: normalizedSponsor,
+                sponsor: normalizedAccount,
                 lockId: lock.resourceLock.lockId,
                 chainId: lock.chainId,
               });
@@ -118,7 +118,7 @@ export async function setupBalanceRoutes(
               // Get allocated balance
               const allocatedBalance = await getAllocatedBalance(
                 server.db,
-                normalizedSponsor,
+                normalizedAccount,
                 lock.chainId,
                 lockIdBigInt,
                 lockDetails.account.claims.items.map((claim) => claim.claimHash)
@@ -162,32 +162,32 @@ export async function setupBalanceRoutes(
     }
   );
 
-  // Get available balance for a specific lock
+  // Get available balance for a specific lock and account
   server.get<{
-    Params: { chainId: string; lockId: string; sponsor: string };
+    Params: { chainId: string; lockId: string; account: string };
   }>(
-    '/balance/:chainId/:lockId/:sponsor',
+    '/balance/:chainId/:lockId/:account',
     async (
       request: FastifyRequest<{
-        Params: { chainId: string; lockId: string; sponsor: string };
+        Params: { chainId: string; lockId: string; account: string };
       }>,
       reply: FastifyReply
     ) => {
       try {
-        const { chainId, lockId, sponsor } = request.params;
+        const { chainId, lockId, account } = request.params;
 
-        let normalizedSponsor: string;
+        let normalizedAccount: string;
         try {
-          normalizedSponsor = getAddress(sponsor);
+          normalizedAccount = getAddress(account);
         } catch {
           reply.code(400);
-          return { error: 'Invalid sponsor address format' };
+          return { error: 'Invalid account address format' };
         }
 
         // Get details from GraphQL
         const response = await getCompactDetails({
           allocator: process.env.ALLOCATOR_ADDRESS!,
-          sponsor: normalizedSponsor,
+          sponsor: normalizedAccount,
           lockId,
           chainId,
         });
@@ -240,7 +240,7 @@ export async function setupBalanceRoutes(
         // Get allocated balance from database
         const allocatedBalance = await getAllocatedBalance(
           server.db,
-          normalizedSponsor,
+          normalizedAccount,
           chainId,
           lockIdBigInt,
           response.account.claims.items.map((claim) => claim.claimHash)

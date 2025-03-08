@@ -21,6 +21,8 @@ pnpm build
 # Copy the updated files to the server
 echo "Copying files to server..."
 scp -r dist/* $SSH_USER@$DOMAIN:$PROJECT_DIR/dist/
+echo "Copying .env file to server..."
+scp .env $SSH_USER@$DOMAIN:$PROJECT_DIR/.env
 
 # SSH into the server and restart the service
 echo "Restarting service on server..."
