@@ -11,6 +11,8 @@ Autocator is a fork of [Smallocator](https://github.com/uniswap/smallocator) wit
   - a valid sponsor signature with the payload when submitting a compact, or
   - an onchain registration of the compact, in which case there's no attached signature
 
+A hosted version is available at [Autocator.org](https://autocator.org/) — Note that it's likely not ready for real production use (do reach out if it goes down).
+
 > ⚠️ Autocator is under development and is intended to serve as a reference for understanding server-based allocator functionality and for testing purposes. Use caution when using Autocator in a production environment.
 
 ## Features
