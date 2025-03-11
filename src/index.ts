@@ -12,7 +12,7 @@ import {
   fetchAndCacheSupportedChains,
   startSupportedChainsRefresh,
 } from './graphql';
-import cors from '@fastify/cors'; // Import cors plugin
+// CORS is handled by nginx
 
 // Configure logger based on environment
 const isProd = process.env.NODE_ENV === 'production';
@@ -99,11 +99,15 @@ async function build(): Promise<FastifyInstance> {
     server
   );
 
-  // Enable CORS for both development and external API access
-  await server.register(cors, {
-    origin: '*', // Allow all origins for API access
-    credentials: true,
-  });
+  // CORS is handled by nginx in production
+  if (process.env.NODE_ENV !== 'production') {
+    // Only enable CORS in development
+    const cors = await import('@fastify/cors');
+    await server.register(cors.default, {
+      origin: '*', // Allow all origins for API access
+      credentials: true,
+    });
+  }
 
   // Initialize database
   await setupDatabase(server);
