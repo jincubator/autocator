@@ -101,7 +101,7 @@ async function build(): Promise<FastifyInstance> {
 
   // Enable CORS for both development and external API access
   await server.register(cors, {
-    origin: true, // Allow all origins for API access
+    origin: '*', // Allow all origins for API access
     credentials: true,
   });
 

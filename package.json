@@ -17,7 +17,7 @@
     "build:all": "pnpm build",
     "test": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --config jest.config.ts --detectOpenHandles --maxWorkers=50% --maxConcurrency=7",
     "test:parallel": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --config jest.config.ts --runInBand=false --bail --maxWorkers=90%",
-    "test:related": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --config jest.config.ts --bail --findRelatedTests --maxWorkers=50% --maxConcurrency=7",
+    "test:related": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --config jest.config.ts --bail --findRelatedTests --maxWorkers=50% --maxConcurrency=7 --passWithNoTests",
     "smoke-test": "node scripts/smoke-test.js",
     "smoke-test:precommit": "SMOKE_TEST_PORT=4000 node scripts/smoke-test.js",
     "lint": "eslint src/",
